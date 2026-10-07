@@ -5,6 +5,8 @@ namespace SwordMastery;
 internal sealed class ModConfig
 {
     public bool ShowHud { get; set; } = true;
+    public int HudX { get; set; } = 24;
+    public int HudY { get; set; } = 24;
     public SButton OpenMenuKey { get; set; } = SButton.K;
 
     public int MaxSwordLevel { get; set; } = 75;

@@ -30,6 +30,19 @@ public interface IGenericModConfigMenuApi
         string? fieldId = null
     );
 
+    void AddNumberOption(
+        IManifest mod,
+        Func<int> getValue,
+        Action<int> setValue,
+        Func<string> name,
+        Func<string>? tooltip = null,
+        int? min = null,
+        int? max = null,
+        int? interval = null,
+        Func<int, string>? formatValue = null,
+        string? fieldId = null
+    );
+
     void AddKeybind(
         IManifest mod,
         Func<SButton> getValue,

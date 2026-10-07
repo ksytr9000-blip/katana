@@ -112,10 +112,10 @@ internal sealed class SkillTreeMenu : IClickableMenu
         IModHelper helper
     )
         : base(
-            x: Math.Max(20, (Game1.uiViewport.Width - Math.Min(1120, Game1.uiViewport.Width - 40)) / 2),
-            y: Math.Max(20, (Game1.uiViewport.Height - Math.Min(800, Game1.uiViewport.Height - 40)) / 2),
-            width: Math.Min(1120, Game1.uiViewport.Width - 40),
-            height: Math.Min(800, Game1.uiViewport.Height - 40),
+            x: Math.Max(16, (Game1.uiViewport.Width - Math.Min(1280, Game1.uiViewport.Width - 32)) / 2),
+            y: Math.Max(16, (Game1.uiViewport.Height - Math.Min(880, Game1.uiViewport.Height - 32)) / 2),
+            width: Math.Min(1280, Game1.uiViewport.Width - 32),
+            height: Math.Min(880, Game1.uiViewport.Height - 32),
             showUpperRightCloseButton: true
         )
     {
@@ -141,9 +141,9 @@ internal sealed class SkillTreeMenu : IClickableMenu
         SkillAreas.Clear();
 
         int tile = GetTileSize();
-        int basicY = yPositionOnScreen + 190;
-        int ohgiY = yPositionOnScreen + 410;
-        int ultimateY = yPositionOnScreen + 625;
+        int basicY = yPositionOnScreen + 205;
+        int ohgiY = yPositionOnScreen + 445;
+        int ultimateY = yPositionOnScreen + 685;
 
         int[] basicXs = ThreeColumns(tile);
         AddSkillArea("BasicA", basicXs[0], basicY, tile);
@@ -163,17 +163,17 @@ internal sealed class SkillTreeMenu : IClickableMenu
     private void AddSkillArea(string id, int x, int y, int tile)
     {
         SkillAreas[id] = new ClickableComponent(
-            new Rectangle(x, y, tile, tile + 78),
+            new Rectangle(x, y, tile, tile + 92),
             id
         );
     }
 
     private int GetTileSize()
     {
-        if (width < 900 || height < 720)
-            return 86;
+        if (width < 980 || height < 760)
+            return 94;
 
-        return 108;
+        return 112;
     }
 
     private int[] ThreeColumns(int tile)
@@ -339,8 +339,8 @@ internal sealed class SkillTreeMenu : IClickableMenu
         DrawMainPanel(b);
         DrawHeader(b);
         DrawSectionLabel(b, "기본 스킬", yPositionOnScreen + 150);
-        DrawSectionLabel(b, "오의", yPositionOnScreen + 370);
-        DrawSectionLabel(b, "극의", yPositionOnScreen + 585);
+        DrawSectionLabel(b, "오의", yPositionOnScreen + 390);
+        DrawSectionLabel(b, "극의", yPositionOnScreen + 630);
 
         DrawSkill(b, "BasicA", "basic");
         DrawSkill(b, "BasicB", "basic");
@@ -414,11 +414,14 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             expText,
             Game1.smallFont,
-            new Vector2(left + 190, yPositionOnScreen + 94),
+            new Vector2(left + 205, yPositionOnScreen + 94),
             Game1.textColor
         );
 
-        Rectangle barBack = new(left + 260, yPositionOnScreen + 98, Math.Min(260, Math.Max(180, width - 760)), 18);
+        int barX = left + 390;
+        int barMaxRight = right - 230;
+        int barWidth = Math.Clamp(barMaxRight - barX, 150, 255);
+        Rectangle barBack = new(barX, yPositionOnScreen + 98, barWidth, 18);
         b.Draw(Game1.staminaRect, barBack, new Color(94, 52, 28));
 
         float ratio = Data.SwordLevel >= Config.MaxSwordLevel
@@ -445,7 +448,8 @@ internal sealed class SkillTreeMenu : IClickableMenu
     private void DrawSectionLabel(SpriteBatch b, string text, int y)
     {
         Vector2 size = Game1.smallFont.MeasureString(text);
-        int w = (int)size.X + 90;
+        int w = Math.Max(260, (int)size.X + 120);
+        int h = 46;
         int x = xPositionOnScreen + (width - w) / 2;
 
         IClickableMenu.drawTextureBox(
@@ -453,7 +457,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             x,
             y,
             w,
-            38,
+            h,
             Color.White
         );
 
@@ -461,7 +465,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             text,
             Game1.smallFont,
-            new Vector2(x + (w - size.X) / 2, y + 8),
+            new Vector2(x + (w - size.X) / 2, y + (h - size.Y) / 2 - 1),
             new Color(89, 48, 24)
         );
     }
@@ -530,7 +534,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             );
         }
 
-        DrawStagePips(b, id, area.X + tile / 2, area.Y + tile + 14, locked);
+        DrawStagePips(b, id, area.X + tile / 2, area.Y + tile + 18, locked);
     }
 
     private void DrawStagePips(SpriteBatch b, string id, int centerX, int y, bool locked)
@@ -538,8 +542,8 @@ internal sealed class SkillTreeMenu : IClickableMenu
         SkillProgress p = Data.Skills[id];
 
         DrawPipRow(b, "I", p.Stage1, centerX, y, locked);
-        DrawPipRow(b, "II", p.Stage2, centerX, y + 24, locked);
-        DrawPipRow(b, "III", p.Stage3, centerX, y + 48, locked);
+        DrawPipRow(b, "II", p.Stage2, centerX, y + 30, locked);
+        DrawPipRow(b, "III", p.Stage3, centerX, y + 60, locked);
     }
 
     private void DrawPipRow(SpriteBatch b, string roman, int filled, int centerX, int y, bool locked)
@@ -644,14 +648,14 @@ internal sealed class SkillTreeMenu : IClickableMenu
         string[] lines = SkillDescriptions[id];
         string state = GetStateText(id);
 
-        int tooltipWidth = 390;
-        int tooltipHeight = 150 + lines.Length * 27;
+        int tooltipWidth = 470;
+        int tooltipHeight = 174 + lines.Length * 32;
 
-        int x = HoverX + 26;
-        int y = HoverY + 24;
+        int x = HoverX + 28;
+        int y = HoverY + 26;
 
         if (x + tooltipWidth > Game1.uiViewport.Width - 16)
-            x = HoverX - tooltipWidth - 22;
+            x = HoverX - tooltipWidth - 24;
 
         if (y + tooltipHeight > Game1.uiViewport.Height - 16)
             y = Game1.uiViewport.Height - tooltipHeight - 16;
@@ -665,54 +669,77 @@ internal sealed class SkillTreeMenu : IClickableMenu
             y,
             tooltipWidth,
             tooltipHeight,
-            new Color(255, 245, 220)
+            Color.White
         );
 
-        Rectangle icon = new(x + 18, y + 18, 64, 64);
-        b.Draw(Icons[id], icon, IsLocked(id, GetGroup(id)) ? Color.White * 0.35f : Color.White);
+        Rectangle inner = new(x + 12, y + 12, tooltipWidth - 24, tooltipHeight - 24);
+        b.Draw(Game1.staminaRect, inner, new Color(74, 42, 27) * 0.96f);
+
+        Rectangle iconFrame = new(x + 22, y + 22, 82, 82);
+        IClickableMenu.drawTextureBox(
+            b,
+            iconFrame.X,
+            iconFrame.Y,
+            iconFrame.Width,
+            iconFrame.Height,
+            new Color(255, 220, 145)
+        );
+
+        Rectangle icon = new(iconFrame.X + 7, iconFrame.Y + 7, 68, 68);
+        b.Draw(
+            Icons[id],
+            icon,
+            IsLocked(id, GetGroup(id)) ? Color.White * 0.35f : Color.White
+        );
 
         Utility.drawTextWithShadow(
             b,
             title,
             Game1.dialogueFont,
-            new Vector2(x + 96, y + 13),
-            new Color(112, 68, 28)
+            new Vector2(x + 122, y + 24),
+            new Color(255, 205, 92)
         );
 
         Utility.drawTextWithShadow(
             b,
             type,
             Game1.smallFont,
-            new Vector2(x + 98, y + 58),
-            Color.DimGray
+            new Vector2(x + 124, y + 70),
+            new Color(221, 189, 145)
         );
 
-        int lineY = y + 92;
+        Rectangle divider = new(x + 22, y + 116, tooltipWidth - 44, 2);
+        b.Draw(Game1.staminaRect, divider, new Color(183, 123, 63) * 0.8f);
+
+        int lineY = y + 136;
         foreach (string line in lines)
         {
             Utility.drawTextWithShadow(
                 b,
                 line,
                 Game1.smallFont,
-                new Vector2(x + 18, lineY),
-                Game1.textColor
+                new Vector2(x + 28, lineY),
+                Color.White
             );
-            lineY += 27;
+            lineY += 32;
         }
+
+        Rectangle footer = new(x + 22, y + tooltipHeight - 66, tooltipWidth - 44, 2);
+        b.Draw(Game1.staminaRect, footer, new Color(183, 123, 63) * 0.65f);
 
         Utility.drawTextWithShadow(
             b,
             $"현재 투자: {Data.Skills[id].TotalPoints} / 15",
             Game1.smallFont,
-            new Vector2(x + 18, tooltipHeight + y - 49),
-            new Color(126, 76, 31)
+            new Vector2(x + 28, y + tooltipHeight - 54),
+            new Color(255, 205, 92)
         );
 
         Utility.drawTextWithShadow(
             b,
             state,
             Game1.smallFont,
-            new Vector2(x + 18, tooltipHeight + y - 25),
+            new Vector2(x + 230, y + tooltipHeight - 54),
             GetStateColor(id)
         );
     }

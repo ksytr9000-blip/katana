@@ -78,13 +78,44 @@ internal sealed class ModEntry : Mod
             fieldId: "OpenMenuKey"
         );
 
+        gmcm.AddSectionTitle(
+            mod: ModManifest,
+            text: () => "HUD 설정"
+        );
+
         gmcm.AddBoolOption(
             mod: ModManifest,
             getValue: () => Config.ShowHud,
             setValue: value => Config.ShowHud = value,
             name: () => "검술 HUD 표시",
-            tooltip: () => "화면 왼쪽 위의 검술 레벨 / EXP / SP 표시를 켜거나 끕니다.",
+            tooltip: () => "검술 레벨 / EXP / SP 표시를 켜거나 끕니다.",
             fieldId: "ShowHud"
+        );
+
+        gmcm.AddNumberOption(
+            mod: ModManifest,
+            getValue: () => Config.HudX,
+            setValue: value => Config.HudX = value,
+            name: () => "HUD X 위치",
+            tooltip: () => "화면 왼쪽을 기준으로 HUD의 가로 위치를 조절합니다.",
+            min: 0,
+            max: 4000,
+            interval: 8,
+            formatValue: value => $"{value}px",
+            fieldId: "HudX"
+        );
+
+        gmcm.AddNumberOption(
+            mod: ModManifest,
+            getValue: () => Config.HudY,
+            setValue: value => Config.HudY = value,
+            name: () => "HUD Y 위치",
+            tooltip: () => "화면 위쪽을 기준으로 HUD의 세로 위치를 조절합니다.",
+            min: 0,
+            max: 2400,
+            interval: 8,
+            formatValue: value => $"{value}px",
+            fieldId: "HudY"
         );
 
         Monitor.Log("Generic Mod Config Menu integration registered.", LogLevel.Info);
@@ -232,12 +263,15 @@ internal sealed class ModEntry : Mod
             text = $"검술 Lv.{Data.SwordLevel}  EXP {Data.SwordExperience}/{req}  SP:{Data.UnspentSkillPoints}";
         }
 
-        Vector2 pos = new(24f, 24f);
+        float hudX = Math.Clamp(Config.HudX, 0, Math.Max(0, Game1.uiViewport.Width - 220));
+        float hudY = Math.Clamp(Config.HudY, 0, Math.Max(0, Game1.uiViewport.Height - 80));
+
+        Vector2 pos = new(hudX, hudY);
         e.SpriteBatch.DrawString(Game1.smallFont, text, pos + new Vector2(2f, 2f), Color.Black * 0.7f);
         e.SpriteBatch.DrawString(Game1.smallFont, text, pos, Color.White);
 
         string prompt = $"[{Config.OpenMenuKey}] 검술창";
-        Vector2 promptPos = new(24f, 52f);
+        Vector2 promptPos = new(hudX, hudY + 28f);
         e.SpriteBatch.DrawString(Game1.smallFont, prompt, promptPos + new Vector2(2f, 2f), Color.Black * 0.7f);
         e.SpriteBatch.DrawString(Game1.smallFont, prompt, promptPos, Color.White);
     }
