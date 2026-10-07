@@ -1,8 +1,11 @@
+using StardewModdingAPI;
+
 namespace SwordMastery;
 
 internal sealed class ModConfig
 {
     public bool ShowHud { get; set; } = true;
+    public SButton OpenMenuKey { get; set; } = SButton.K;
 
     public int MaxSwordLevel { get; set; } = 75;
     public int ExpPerMonsterKill { get; set; } = 10;

@@ -5,6 +5,7 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using SwordMastery.Models;
 using SwordMastery.Services;
+using SwordMastery.UI;
 
 namespace SwordMastery;
 
@@ -28,6 +29,7 @@ internal sealed class ModEntry : Mod
         helper.Events.GameLoop.DayStarted += OnDayStarted;
         helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
         helper.Events.Display.RenderedHud += OnRenderedHud;
+        helper.Events.Input.ButtonPressed += OnButtonPressed;
 
         helper.ConsoleCommands.Add("sm_status", "Show Sword Mastery status.", CommandStatus);
         helper.ConsoleCommands.Add("sm_add", "Allocate a point. Usage: sm_add basic A | sm_add ohgi | sm_add ultimate", CommandAdd);
@@ -38,6 +40,28 @@ internal sealed class ModEntry : Mod
         helper.ConsoleCommands.Add("sm_reset", "Pay the configured gold cost and schedule respec for next morning.", CommandReset);
 
         Monitor.Log("Sword Mastery prototype loaded.", LogLevel.Info);
+    }
+
+    private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        if (e.Button != Config.OpenMenuKey)
+            return;
+
+        if (Game1.activeClickableMenu is SkillTreeMenu)
+        {
+            Game1.exitActiveMenu();
+            return;
+        }
+
+        if (Game1.activeClickableMenu is not null)
+            return;
+
+        Skills.UpdateUnlockState(Data);
+        Game1.activeClickableMenu = new SkillTreeMenu(Data, Config, Progression, Skills);
+        Game1.playSound("bigSelect");
     }
 
     private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
@@ -110,17 +134,22 @@ internal sealed class ModEntry : Mod
         string text;
         if (Data.SwordLevel >= Config.MaxSwordLevel)
         {
-            text = $"Sword Lv.{Data.SwordLevel}  MASTER  SP:{Data.UnspentSkillPoints}";
+            text = $"검술 Lv.{Data.SwordLevel}  MASTER  SP:{Data.UnspentSkillPoints}";
         }
         else
         {
             int req = Progression.GetRequiredXp(Data.SwordLevel);
-            text = $"Sword Lv.{Data.SwordLevel}  EXP {Data.SwordExperience}/{req}  SP:{Data.UnspentSkillPoints}";
+            text = $"검술 Lv.{Data.SwordLevel}  EXP {Data.SwordExperience}/{req}  SP:{Data.UnspentSkillPoints}";
         }
 
         Vector2 pos = new(24f, 24f);
         e.SpriteBatch.DrawString(Game1.smallFont, text, pos + new Vector2(2f, 2f), Color.Black * 0.7f);
         e.SpriteBatch.DrawString(Game1.smallFont, text, pos, Color.White);
+
+        string prompt = $"[{Config.OpenMenuKey}] 검술창";
+        Vector2 promptPos = new(24f, 52f);
+        e.SpriteBatch.DrawString(Game1.smallFont, prompt, promptPos + new Vector2(2f, 2f), Color.Black * 0.7f);
+        e.SpriteBatch.DrawString(Game1.smallFont, prompt, promptPos, Color.White);
     }
 
     private void CommandStatus(string command, string[] args)
