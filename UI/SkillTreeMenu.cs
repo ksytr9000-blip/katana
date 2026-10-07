@@ -38,9 +38,9 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
     private readonly Dictionary<string, string> SkillTypes = new()
     {
-        ["BasicA"] = "기본 스킬 A",
-        ["BasicB"] = "기본 스킬 B",
-        ["BasicC"] = "기본 스킬 C",
+        ["BasicA"] = "기초검술 A",
+        ["BasicB"] = "기초검술 B",
+        ["BasicC"] = "기초검술 C",
 
         ["OhgiA"] = "오의 A",
         ["OhgiB"] = "오의 B",
@@ -112,10 +112,10 @@ internal sealed class SkillTreeMenu : IClickableMenu
         IModHelper helper
     )
         : base(
-            x: Math.Max(16, (Game1.uiViewport.Width - Math.Min(1280, Game1.uiViewport.Width - 32)) / 2),
-            y: Math.Max(16, (Game1.uiViewport.Height - Math.Min(880, Game1.uiViewport.Height - 32)) / 2),
-            width: Math.Min(1280, Game1.uiViewport.Width - 32),
-            height: Math.Min(880, Game1.uiViewport.Height - 32),
+            x: Math.Max(12, (Game1.uiViewport.Width - Math.Min(1380, Game1.uiViewport.Width - 24)) / 2),
+            y: Math.Max(12, (Game1.uiViewport.Height - Math.Min(1000, Game1.uiViewport.Height - 24)) / 2),
+            width: Math.Min(1380, Game1.uiViewport.Width - 24),
+            height: Math.Min(1000, Game1.uiViewport.Height - 24),
             showUpperRightCloseButton: true
         )
     {
@@ -141,9 +141,15 @@ internal sealed class SkillTreeMenu : IClickableMenu
         SkillAreas.Clear();
 
         int tile = GetTileSize();
-        int basicY = yPositionOnScreen + 205;
-        int ohgiY = yPositionOnScreen + 445;
-        int ultimateY = yPositionOnScreen + 685;
+
+        int basicLabelY = yPositionOnScreen + 155;
+        int basicY = basicLabelY + 62;
+
+        int ohgiLabelY = basicY + tile + 116;
+        int ohgiY = ohgiLabelY + 62;
+
+        int ultimateLabelY = ohgiY + tile + 116;
+        int ultimateY = ultimateLabelY + 62;
 
         int[] basicXs = ThreeColumns(tile);
         AddSkillArea("BasicA", basicXs[0], basicY, tile);
@@ -163,17 +169,20 @@ internal sealed class SkillTreeMenu : IClickableMenu
     private void AddSkillArea(string id, int x, int y, int tile)
     {
         SkillAreas[id] = new ClickableComponent(
-            new Rectangle(x, y, tile, tile + 92),
+            new Rectangle(x, y, tile, tile + 106),
             id
         );
     }
 
     private int GetTileSize()
     {
-        if (width < 980 || height < 760)
-            return 94;
+        if (height < 820)
+            return 88;
 
-        return 112;
+        if (height < 940 || width < 1100)
+            return 98;
+
+        return 108;
     }
 
     private int[] ThreeColumns(int tile)
@@ -338,9 +347,19 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         DrawMainPanel(b);
         DrawHeader(b);
-        DrawSectionLabel(b, "기본 스킬", yPositionOnScreen + 150);
-        DrawSectionLabel(b, "오의", yPositionOnScreen + 390);
-        DrawSectionLabel(b, "극의", yPositionOnScreen + 630);
+        int tile = GetTileSize();
+
+        int basicLabelY = yPositionOnScreen + 155;
+        int basicY = basicLabelY + 62;
+
+        int ohgiLabelY = basicY + tile + 116;
+        int ohgiY = ohgiLabelY + 62;
+
+        int ultimateLabelY = ohgiY + tile + 116;
+
+        DrawSectionLabel(b, "기초검술", basicLabelY);
+        DrawSectionLabel(b, "오의", ohgiLabelY);
+        DrawSectionLabel(b, "극의", ultimateLabelY);
 
         DrawSkill(b, "BasicA", "basic");
         DrawSkill(b, "BasicB", "basic");
@@ -418,9 +437,14 @@ internal sealed class SkillTreeMenu : IClickableMenu
             Game1.textColor
         );
 
-        int barX = left + 390;
-        int barMaxRight = right - 230;
-        int barWidth = Math.Clamp(barMaxRight - barX, 150, 255);
+        bool wideHeader = width >= 1100;
+        int barX = wideHeader ? left + 500 : left + 365;
+        int barWidth = wideHeader ? 220 : 150;
+
+        int maxBarRight = right - 235;
+        if (barX + barWidth > maxBarRight)
+            barWidth = Math.Max(120, maxBarRight - barX);
+
         Rectangle barBack = new(barX, yPositionOnScreen + 98, barWidth, 18);
         b.Draw(Game1.staminaRect, barBack, new Color(94, 52, 28));
 
@@ -448,8 +472,8 @@ internal sealed class SkillTreeMenu : IClickableMenu
     private void DrawSectionLabel(SpriteBatch b, string text, int y)
     {
         Vector2 size = Game1.smallFont.MeasureString(text);
-        int w = Math.Max(260, (int)size.X + 120);
-        int h = 46;
+        int w = Math.Max(300, (int)size.X + 150);
+        int h = 52;
         int x = xPositionOnScreen + (width - w) / 2;
 
         IClickableMenu.drawTextureBox(
@@ -542,8 +566,8 @@ internal sealed class SkillTreeMenu : IClickableMenu
         SkillProgress p = Data.Skills[id];
 
         DrawPipRow(b, "I", p.Stage1, centerX, y, locked);
-        DrawPipRow(b, "II", p.Stage2, centerX, y + 30, locked);
-        DrawPipRow(b, "III", p.Stage3, centerX, y + 60, locked);
+        DrawPipRow(b, "II", p.Stage2, centerX, y + 34, locked);
+        DrawPipRow(b, "III", p.Stage3, centerX, y + 68, locked);
     }
 
     private void DrawPipRow(SpriteBatch b, string roman, int filled, int centerX, int y, bool locked)
@@ -560,7 +584,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             roman,
             Game1.tinyFont,
-            new Vector2(startX - 28 - labelSize.X / 2, y - 4),
+            new Vector2(startX - 30 - labelSize.X / 2, y - 5),
             Color.DimGray
         );
 
