@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
 using SwordMastery.Models;
@@ -14,11 +15,12 @@ internal sealed class SkillTreeMenu : IClickableMenu
     private readonly ProgressionService Progression;
     private readonly SkillService Skills;
 
-    private readonly Dictionary<string, ClickableComponent> PlusButtons = new();
-    private readonly Dictionary<string, ClickableComponent> SelectButtons = new();
-    private readonly Dictionary<string, ClickableComponent> RowAreas = new();
+    private readonly Dictionary<string, Texture2D> Icons = new();
+    private readonly Dictionary<string, ClickableComponent> SkillAreas = new();
 
     private string? HoveredSkillId;
+    private int HoverX;
+    private int HoverY;
 
     private readonly Dictionary<string, string> SkillNames = new()
     {
@@ -34,7 +36,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
         ["UltimateB"] = "보법의 극"
     };
 
-    private readonly Dictionary<string, string> SkillSubtitles = new()
+    private readonly Dictionary<string, string> SkillTypes = new()
     {
         ["BasicA"] = "기본 스킬 A",
         ["BasicB"] = "기본 스킬 B",
@@ -59,8 +61,8 @@ internal sealed class SkillTreeMenu : IClickableMenu
         ["BasicB"] = new[]
         {
             "1단계: 전방 베기",
-            "2단계: 전방 넓은 범위 베기",
-            "3단계: 직선 검기 발생"
+            "2단계: 넓은 범위의 전방 베기",
+            "3단계: 직선으로 날아가는 검기"
         },
         ["BasicC"] = new[]
         {
@@ -68,40 +70,37 @@ internal sealed class SkillTreeMenu : IClickableMenu
             "2단계: 전방 180도 4회 베기",
             "3단계: 전방 180도 6회 베기"
         },
+
         ["OhgiA"] = new[]
         {
-            "기본스킬 A 마스터 필요",
-            "1단계: 경로상 모든 적 강타",
+            "전방 대쉬 후 경로상의 적을 강하게 베기",
             "2단계: 경로 폭 증가",
             "3단계: 경로 폭 대폭 증가"
         },
         ["OhgiB"] = new[]
         {
-            "기본스킬 B 마스터 필요",
-            "1단계: 기본 공격 검기화",
-            "2단계: 사거리/폭 증가",
-            "3단계: 무한 사거리·전 관통"
+            "기본 검 공격에 원거리 검기 부여",
+            "2단계: 사거리 증가 + 2마리 관통",
+            "3단계: 무제한 사거리 + 전 관통"
         },
         ["OhgiC"] = new[]
         {
-            "기본스킬 C 마스터 필요",
-            "1단계: 전방위 3회 타격",
-            "2단계: 범위 증가 + 6회",
-            "3단계: 범위 증가 + 10회"
+            "전방위 다중 검격",
+            "2단계: 범위 증가 + 6회 타격",
+            "3단계: 범위 증가 + 10회 타격"
         },
+
         ["UltimateA"] = new[]
         {
-            "주변 적 자동 참격 패시브",
-            "1단계: 작은 범위·약한 피해",
-            "2단계: 중간 범위·보통 피해",
-            "3단계: 큰 범위·강한 피해"
+            "범위 안의 적에게 상시 자동 검격",
+            "2단계: 범위와 피해 증가",
+            "3단계: 더 넓은 범위와 강한 피해"
         },
         ["UltimateB"] = new[]
         {
-            "무제한 이동기 + 주변 검격",
-            "1단계: 짧은 거리·약한 피해",
-            "2단계: 중간 거리·보통 피해",
-            "3단계: 긴 거리·강한 피해"
+            "쿨다운 없는 이동기 + 주변 검격",
+            "2단계: 이동거리와 피해 증가",
+            "3단계: 긴 이동거리와 강한 피해"
         }
     };
 
@@ -109,13 +108,14 @@ internal sealed class SkillTreeMenu : IClickableMenu
         SaveData data,
         ModConfig config,
         ProgressionService progression,
-        SkillService skills
+        SkillService skills,
+        IModHelper helper
     )
         : base(
-            x: Math.Max(32, (Game1.uiViewport.Width - Math.Min(1040, Game1.uiViewport.Width - 64)) / 2),
-            y: Math.Max(32, (Game1.uiViewport.Height - Math.Min(720, Game1.uiViewport.Height - 64)) / 2),
-            width: Math.Min(1040, Game1.uiViewport.Width - 64),
-            height: Math.Min(720, Game1.uiViewport.Height - 64),
+            x: Math.Max(20, (Game1.uiViewport.Width - Math.Min(1120, Game1.uiViewport.Width - 40)) / 2),
+            y: Math.Max(20, (Game1.uiViewport.Height - Math.Min(800, Game1.uiViewport.Height - 40)) / 2),
+            width: Math.Min(1120, Game1.uiViewport.Width - 40),
+            height: Math.Min(800, Game1.uiViewport.Height - 40),
             showUpperRightCloseButton: true
         )
     {
@@ -124,89 +124,99 @@ internal sealed class SkillTreeMenu : IClickableMenu
         Progression = progression;
         Skills = skills;
 
-        BuildButtons();
+        Icons["BasicA"] = helper.ModContent.Load<Texture2D>("assets/icons/basic_a.png");
+        Icons["BasicB"] = helper.ModContent.Load<Texture2D>("assets/icons/basic_b.png");
+        Icons["BasicC"] = helper.ModContent.Load<Texture2D>("assets/icons/basic_c.png");
+        Icons["OhgiA"] = helper.ModContent.Load<Texture2D>("assets/icons/ohgi_a.png");
+        Icons["OhgiB"] = helper.ModContent.Load<Texture2D>("assets/icons/ohgi_b.png");
+        Icons["OhgiC"] = helper.ModContent.Load<Texture2D>("assets/icons/ohgi_c.png");
+        Icons["UltimateA"] = helper.ModContent.Load<Texture2D>("assets/icons/ultimate_a.png");
+        Icons["UltimateB"] = helper.ModContent.Load<Texture2D>("assets/icons/ultimate_b.png");
+
+        BuildSkillAreas();
     }
 
-    private void BuildButtons()
+    private void BuildSkillAreas()
     {
-        PlusButtons.Clear();
-        SelectButtons.Clear();
-        RowAreas.Clear();
+        SkillAreas.Clear();
 
-        int rowY = yPositionOnScreen + 126;
+        int tile = GetTileSize();
+        int basicY = yPositionOnScreen + 190;
+        int ohgiY = yPositionOnScreen + 410;
+        int ultimateY = yPositionOnScreen + 625;
 
-        AddRow("BasicA", rowY, false);
-        rowY += 52;
-        AddRow("BasicB", rowY, false);
-        rowY += 52;
-        AddRow("BasicC", rowY, false);
+        int[] basicXs = ThreeColumns(tile);
+        AddSkillArea("BasicA", basicXs[0], basicY, tile);
+        AddSkillArea("BasicB", basicXs[1], basicY, tile);
+        AddSkillArea("BasicC", basicXs[2], basicY, tile);
 
-        rowY += 78;
+        int[] ohgiXs = ThreeColumns(tile);
+        AddSkillArea("OhgiA", ohgiXs[0], ohgiY, tile);
+        AddSkillArea("OhgiB", ohgiXs[1], ohgiY, tile);
+        AddSkillArea("OhgiC", ohgiXs[2], ohgiY, tile);
 
-        AddRow("OhgiA", rowY, true);
-        rowY += 52;
-        AddRow("OhgiB", rowY, true);
-        rowY += 52;
-        AddRow("OhgiC", rowY, true);
-
-        rowY += 78;
-
-        AddRow("UltimateA", rowY, true);
-        rowY += 52;
-        AddRow("UltimateB", rowY, true);
+        int[] ultimateXs = TwoColumns(tile);
+        AddSkillArea("UltimateA", ultimateXs[0], ultimateY, tile);
+        AddSkillArea("UltimateB", ultimateXs[1], ultimateY, tile);
     }
 
-    private void AddRow(string id, int y, bool hasSelect)
+    private void AddSkillArea(string id, int x, int y, int tile)
     {
-        RowAreas[id] = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + 30, y, width - 60, 46),
+        SkillAreas[id] = new ClickableComponent(
+            new Rectangle(x, y, tile, tile + 62),
             id
         );
+    }
 
-        if (hasSelect)
+    private int GetTileSize()
+    {
+        if (width < 900 || height < 720)
+            return 86;
+
+        return 108;
+    }
+
+    private int[] ThreeColumns(int tile)
+    {
+        int gap = Math.Max(55, (width - (tile * 3) - 240) / 2);
+        int total = tile * 3 + gap * 2;
+        int start = xPositionOnScreen + (width - total) / 2;
+
+        return new[]
         {
-            SelectButtons[id] = new ClickableComponent(
-                new Rectangle(xPositionOnScreen + width - 210, y + 4, 112, 40),
-                id
-            );
-        }
+            start,
+            start + tile + gap,
+            start + (tile + gap) * 2
+        };
+    }
 
-        PlusButtons[id] = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + width - 86, y + 4, 46, 40),
-            id
-        );
+    private int[] TwoColumns(int tile)
+    {
+        int gap = Math.Max(150, width / 4);
+        int total = tile * 2 + gap;
+        int start = xPositionOnScreen + (width - total) / 2;
+
+        return new[]
+        {
+            start,
+            start + tile + gap
+        };
     }
 
     public override void performHoverAction(int x, int y)
     {
         base.performHoverAction(x, y);
 
+        HoverX = x;
+        HoverY = y;
         HoveredSkillId = null;
 
-        foreach (var pair in RowAreas)
+        foreach (var pair in SkillAreas)
         {
             if (pair.Value.containsPoint(x, y))
             {
                 HoveredSkillId = pair.Key;
-                return;
-            }
-        }
-
-        foreach (var pair in SelectButtons)
-        {
-            if (pair.Value.containsPoint(x, y))
-            {
-                HoveredSkillId = pair.Key;
-                return;
-            }
-        }
-
-        foreach (var pair in PlusButtons)
-        {
-            if (pair.Value.containsPoint(x, y))
-            {
-                HoveredSkillId = pair.Key;
-                return;
+                break;
             }
         }
     }
@@ -218,64 +228,66 @@ internal sealed class SkillTreeMenu : IClickableMenu
         if (upperRightCloseButton?.containsPoint(x, y) == true)
             return;
 
-        foreach (var pair in SelectButtons)
+        foreach (var pair in SkillAreas)
         {
             if (!pair.Value.containsPoint(x, y))
                 continue;
 
             string id = pair.Key;
             bool ok = false;
-            string message = "";
+            string message;
 
-            if (id.StartsWith("Ohgi"))
-                ok = Skills.TrySelectOhgi(Data, id[^1].ToString(), out message);
-            else if (id.StartsWith("Ultimate"))
-                ok = Skills.TrySelectUltimate(Data, id[^1].ToString(), out message);
-
-            if (ok)
+            if (id.StartsWith("Basic"))
             {
-                Game1.playSound("coin");
-                Skills.UpdateUnlockState(Data);
+                ok = Skills.TryAllocateBasic(Data, id[^1].ToString(), out message);
+            }
+            else if (id.StartsWith("Ohgi"))
+            {
+                string branch = id[^1].ToString();
+
+                if (!Data.OhgiAccessGranted)
+                {
+                    message = "오의가 아직 해방되지 않았습니다.";
+                }
+                else if (Data.SelectedOhgi is null)
+                {
+                    ok = Skills.TrySelectOhgi(Data, branch, out message);
+                }
+                else if (Data.SelectedOhgi == branch)
+                {
+                    ok = Skills.TryAllocateOhgi(Data, out message);
+                }
+                else
+                {
+                    message = "이미 다른 오의를 선택했습니다.";
+                }
             }
             else
             {
-                Game1.playSound("cancel");
-            }
+                string branch = id[^1].ToString();
 
-            Game1.addHUDMessage(new HUDMessage(message));
-            return;
-        }
-
-        foreach (var pair in PlusButtons)
-        {
-            if (!pair.Value.containsPoint(x, y))
-                continue;
-
-            string id = pair.Key;
-            bool ok = false;
-            string message = "";
-
-            if (id.StartsWith("Basic"))
-                ok = Skills.TryAllocateBasic(Data, id[^1].ToString(), out message);
-            else if (id.StartsWith("Ohgi"))
-            {
-                if (Data.SelectedOhgi == id[^1].ToString())
-                    ok = Skills.TryAllocateOhgi(Data, out message);
-                else
-                    message = "선택한 오의만 강화할 수 있습니다.";
-            }
-            else if (id.StartsWith("Ultimate"))
-            {
-                if (Data.SelectedUltimate == id[^1].ToString())
+                if (!Data.UltimateAccessGranted)
+                {
+                    message = "극의가 아직 해방되지 않았습니다.";
+                }
+                else if (Data.SelectedUltimate is null)
+                {
+                    ok = Skills.TrySelectUltimate(Data, branch, out message);
+                }
+                else if (Data.SelectedUltimate == branch)
+                {
                     ok = Skills.TryAllocateUltimate(Data, out message);
+                }
                 else
-                    message = "선택한 극의만 강화할 수 있습니다.";
+                {
+                    message = "이미 다른 극의를 선택했습니다.";
+                }
             }
 
             if (ok)
             {
-                Game1.playSound("coin");
                 Skills.UpdateUnlockState(Data);
+                Game1.playSound("coin");
             }
             else
             {
@@ -291,6 +303,48 @@ internal sealed class SkillTreeMenu : IClickableMenu
     {
         drawBackground(b);
 
+        DrawMainPanel(b);
+        DrawHeader(b);
+        DrawSectionLabel(b, "기본 스킬", yPositionOnScreen + 150);
+        DrawSectionLabel(b, "오의", yPositionOnScreen + 370);
+        DrawSectionLabel(b, "극의", yPositionOnScreen + 585);
+
+        DrawBranchNote(
+            b,
+            Data.SelectedOhgi is null
+                ? "3가지 중 1가지만 선택할 수 있습니다."
+                : "선택한 오의 외의 분기는 잠겨 있습니다.",
+            yPositionOnScreen + 392
+        );
+
+        DrawBranchNote(
+            b,
+            Data.SelectedUltimate is null
+                ? "2가지 중 1가지만 선택할 수 있습니다."
+                : "선택한 극의 외의 분기는 잠겨 있습니다.",
+            yPositionOnScreen + 607
+        );
+
+        DrawSkill(b, "BasicA", "basic");
+        DrawSkill(b, "BasicB", "basic");
+        DrawSkill(b, "BasicC", "basic");
+
+        DrawSkill(b, "OhgiA", "ohgi");
+        DrawSkill(b, "OhgiB", "ohgi");
+        DrawSkill(b, "OhgiC", "ohgi");
+
+        DrawSkill(b, "UltimateA", "ultimate");
+        DrawSkill(b, "UltimateB", "ultimate");
+
+        if (!string.IsNullOrEmpty(HoveredSkillId))
+            DrawTooltip(b, HoveredSkillId!);
+
+        upperRightCloseButton?.draw(b);
+        drawMouse(b);
+    }
+
+    private void DrawMainPanel(SpriteBatch b)
+    {
         IClickableMenu.drawTextureBox(
             b,
             xPositionOnScreen,
@@ -300,209 +354,336 @@ internal sealed class SkillTreeMenu : IClickableMenu
             Color.White
         );
 
-        int left = xPositionOnScreen + 38;
-        int right = xPositionOnScreen + width - 38;
+        Rectangle inner = new(
+            xPositionOnScreen + 18,
+            yPositionOnScreen + 18,
+            width - 36,
+            height - 36
+        );
+
+        b.Draw(Game1.staminaRect, inner, new Color(255, 235, 186) * 0.20f);
+    }
+
+    private void DrawHeader(SpriteBatch b)
+    {
+        int left = xPositionOnScreen + 42;
+        int right = xPositionOnScreen + width - 42;
 
         Utility.drawTextWithShadow(
             b,
             "검술",
             Game1.dialogueFont,
-            new Vector2(left, yPositionOnScreen + 28),
+            new Vector2(xPositionOnScreen + width / 2 - 52, yPositionOnScreen + 26),
             Game1.textColor
         );
 
+        Utility.drawTextWithShadow(
+            b,
+            $"검술 Lv.{Data.SwordLevel}",
+            Game1.smallFont,
+            new Vector2(left, yPositionOnScreen + 94),
+            Game1.textColor
+        );
+
+        int req = Data.SwordLevel >= Config.MaxSwordLevel
+            ? 1
+            : Math.Max(1, Progression.GetRequiredXp(Data.SwordLevel));
+
         string expText = Data.SwordLevel >= Config.MaxSwordLevel
-            ? $"Lv.{Data.SwordLevel}  MASTER"
-            : $"Lv.{Data.SwordLevel}   EXP {Data.SwordExperience}/{Progression.GetRequiredXp(Data.SwordLevel)}";
+            ? "MASTER"
+            : $"EXP {Data.SwordExperience} / {req}";
 
         Utility.drawTextWithShadow(
             b,
             expText,
             Game1.smallFont,
-            new Vector2(left + 150, yPositionOnScreen + 42),
+            new Vector2(left + 190, yPositionOnScreen + 94),
             Game1.textColor
         );
+
+        Rectangle barBack = new(left + 350, yPositionOnScreen + 98, Math.Max(120, width - 650), 18);
+        b.Draw(Game1.staminaRect, barBack, new Color(94, 52, 28));
+
+        float ratio = Data.SwordLevel >= Config.MaxSwordLevel
+            ? 1f
+            : Math.Clamp((float)Data.SwordExperience / req, 0f, 1f);
+
+        Rectangle barFill = new(
+            barBack.X + 3,
+            barBack.Y + 3,
+            (int)((barBack.Width - 6) * ratio),
+            barBack.Height - 6
+        );
+        b.Draw(Game1.staminaRect, barFill, new Color(83, 176, 74));
 
         Utility.drawTextWithShadow(
             b,
             $"남은 SP: {Data.UnspentSkillPoints}",
             Game1.smallFont,
-            new Vector2(right - 180, yPositionOnScreen + 42),
+            new Vector2(right - 160, yPositionOnScreen + 94),
             Game1.textColor
         );
+    }
 
-        int rowY = yPositionOnScreen + 100;
+    private void DrawSectionLabel(SpriteBatch b, string text, int y)
+    {
+        Vector2 size = Game1.smallFont.MeasureString(text);
+        int w = (int)size.X + 90;
+        int x = xPositionOnScreen + (width - w) / 2;
 
-        DrawSectionTitle(b, "기본 스킬", rowY);
-        rowY += 26;
-        DrawSkillRow(b, "BasicA", rowY, "A", "basic");
-        rowY += 52;
-        DrawSkillRow(b, "BasicB", rowY, "B", "basic");
-        rowY += 52;
-        DrawSkillRow(b, "BasicC", rowY, "C", "basic");
-
-        rowY += 58;
-        string ohgiState = Data.OhgiAccessGranted
-            ? "해방됨"
-            : Data.OhgiQuestAvailable ? "해방 퀘스트 가능" : "잠김";
-        DrawSectionTitle(b, $"오의  —  {ohgiState}", rowY);
-        rowY += 26;
-        DrawSkillRow(b, "OhgiA", rowY, "A", "ohgi");
-        rowY += 52;
-        DrawSkillRow(b, "OhgiB", rowY, "B", "ohgi");
-        rowY += 52;
-        DrawSkillRow(b, "OhgiC", rowY, "C", "ohgi");
-
-        rowY += 58;
-        string ultimateState = Data.UltimateAccessGranted
-            ? "해방됨"
-            : Data.UltimateQuestAvailable ? "해방 퀘스트 가능" : "잠김";
-        DrawSectionTitle(b, $"극의  —  {ultimateState}", rowY);
-        rowY += 26;
-        DrawSkillRow(b, "UltimateA", rowY, "A", "ultimate");
-        rowY += 52;
-        DrawSkillRow(b, "UltimateB", rowY, "B", "ultimate");
+        IClickableMenu.drawTextureBox(
+            b,
+            x,
+            y,
+            w,
+            38,
+            Color.White
+        );
 
         Utility.drawTextWithShadow(
             b,
-            $"[{Config.OpenMenuKey}] 닫기  ·  기술 이름은 마우스를 올리면 표시",
+            text,
             Game1.smallFont,
-            new Vector2(left, yPositionOnScreen + height - 40),
+            new Vector2(x + (w - size.X) / 2, y + 8),
+            new Color(89, 48, 24)
+        );
+    }
+
+    private void DrawBranchNote(SpriteBatch b, string text, int y)
+    {
+        Vector2 size = Game1.smallFont.MeasureString(text);
+        Utility.drawTextWithShadow(
+            b,
+            text,
+            Game1.smallFont,
+            new Vector2(xPositionOnScreen + (width - size.X) / 2, y),
+            Color.DimGray
+        );
+    }
+
+    private void DrawSkill(SpriteBatch b, string id, string group)
+    {
+        Rectangle area = SkillAreas[id].bounds;
+        int tile = area.Width;
+        bool selected = IsSelected(id, group);
+        bool locked = IsLocked(id, group);
+        bool hovered = HoveredSkillId == id;
+
+        Rectangle glow = new(area.X - 6, area.Y - 6, tile + 12, tile + 12);
+
+        if (selected)
+        {
+            IClickableMenu.drawTextureBox(
+                b,
+                glow.X,
+                glow.Y,
+                glow.Width,
+                glow.Height,
+                new Color(255, 191, 54)
+            );
+        }
+        else if (hovered && !locked)
+        {
+            IClickableMenu.drawTextureBox(
+                b,
+                glow.X,
+                glow.Y,
+                glow.Width,
+                glow.Height,
+                new Color(255, 226, 144)
+            );
+        }
+
+        IClickableMenu.drawTextureBox(
+            b,
+            area.X,
+            area.Y,
+            tile,
+            tile,
+            locked ? new Color(150, 150, 150) : Color.White
+        );
+
+        Rectangle iconRect = new(area.X + 8, area.Y + 8, tile - 16, tile - 16);
+        b.Draw(Icons[id], iconRect, locked ? Color.White * 0.28f : Color.White);
+
+        if (locked)
+        {
+            b.Draw(Game1.staminaRect, iconRect, Color.Black * 0.42f);
+            DrawLock(b, new Rectangle(area.Right - 33, area.Bottom - 33 - 62, 24, 24));
+        }
+
+        if (Data.Skills[id].IsMastered)
+        {
+            Rectangle master = new(area.X + 5, area.Y + 5, 24, 18);
+            b.Draw(Game1.staminaRect, master, new Color(255, 186, 39) * 0.85f);
+            Utility.drawTextWithShadow(
+                b,
+                "M",
+                Game1.tinyFont,
+                new Vector2(master.X + 6, master.Y + 1),
+                Color.DarkRed
+            );
+        }
+
+        DrawStagePips(b, id, area.X + tile / 2, area.Y + tile + 10, locked);
+    }
+
+    private void DrawStagePips(SpriteBatch b, string id, int centerX, int y, bool locked)
+    {
+        SkillProgress p = Data.Skills[id];
+
+        DrawPipRow(b, "I", p.Stage1, centerX, y, locked);
+        DrawPipRow(b, "II", p.Stage2, centerX, y + 17, locked);
+        DrawPipRow(b, "III", p.Stage3, centerX, y + 34, locked);
+    }
+
+    private void DrawPipRow(SpriteBatch b, string roman, int filled, int centerX, int y, bool locked)
+    {
+        const int pip = 9;
+        const int gap = 5;
+        const int count = 5;
+
+        int totalWidth = count * pip + (count - 1) * gap;
+        int startX = centerX - totalWidth / 2 + 8;
+
+        Vector2 labelSize = Game1.tinyFont.MeasureString(roman);
+        Utility.drawTextWithShadow(
+            b,
+            roman,
+            Game1.tinyFont,
+            new Vector2(startX - 28 - labelSize.X / 2, y - 4),
             Color.DimGray
         );
 
-        if (!string.IsNullOrEmpty(HoveredSkillId))
-            DrawTooltip(b, HoveredSkillId!);
-
-        upperRightCloseButton?.draw(b);
-        drawMouse(b);
-    }
-
-    private void DrawSectionTitle(SpriteBatch b, string title, int y)
-    {
-        Utility.drawTextWithShadow(
-            b,
-            title,
-            Game1.smallFont,
-            new Vector2(xPositionOnScreen + 38, y),
-            Color.DarkSlateBlue
-        );
-    }
-
-    private void DrawSkillRow(SpriteBatch b, string id, int y, string badgeText, string group)
-    {
-        var skill = Data.Skills[id];
-
-        Rectangle row = RowAreas[id].bounds;
-        bool hovered = HoveredSkillId == id;
-
-        b.Draw(Game1.staminaRect, row, hovered ? Color.Goldenrod * 0.14f : Color.Black * 0.08f);
-
-        Rectangle badge = new(row.X + 8, row.Y + 5, 36, 36);
-        IClickableMenu.drawTextureBox(b, badge.X, badge.Y, badge.Width, badge.Height, Color.White);
-
-        Vector2 badgeSize = Game1.smallFont.MeasureString(badgeText);
-        Utility.drawTextWithShadow(
-            b,
-            badgeText,
-            Game1.smallFont,
-            new Vector2(badge.Center.X - badgeSize.X / 2f, badge.Center.Y - badgeSize.Y / 2f),
-            Game1.textColor
-        );
-
-        string progress = $"I {skill.Stage1}/5   II {skill.Stage2}/5   III {skill.Stage3}/5";
-        Utility.drawTextWithShadow(
-            b,
-            progress,
-            Game1.smallFont,
-            new Vector2(row.X + 64, row.Y + 12),
-            skill.IsMastered ? Color.DarkGreen : Game1.textColor
-        );
-
-        bool selected = group switch
+        for (int i = 0; i < count; i++)
         {
-            "ohgi" => Data.SelectedOhgi == id[^1].ToString(),
-            "ultimate" => Data.SelectedUltimate == id[^1].ToString(),
-            _ => true
-        };
-
-        if (group != "basic")
-        {
-            bool access = group == "ohgi" ? Data.OhgiAccessGranted : Data.UltimateAccessGranted;
-            string selectedBranch = group == "ohgi" ? Data.SelectedOhgi ?? "" : Data.SelectedUltimate ?? "";
-
-            string label;
-            Color labelColor;
-
-            if (!access)
-            {
-                label = "잠김";
-                labelColor = Color.Gray;
-            }
-            else if (selected)
-            {
-                label = "선택됨";
-                labelColor = Color.DarkGreen;
-            }
-            else if (!string.IsNullOrEmpty(selectedBranch))
-            {
-                label = "선택불가";
-                labelColor = Color.Gray;
-            }
+            Color c;
+            if (locked)
+                c = new Color(110, 105, 98);
+            else if (i < filled)
+                c = new Color(239, 145, 22);
             else
-            {
-                label = "선택";
-                labelColor = Color.DarkSlateBlue;
-            }
+                c = new Color(176, 158, 128);
 
-            DrawButton(b, SelectButtons[id].bounds, label, labelColor);
+            Rectangle r = new(startX + i * (pip + gap), y, pip, pip);
+            b.Draw(Game1.staminaRect, r, c);
+
+            Rectangle inner = new(r.X + 2, r.Y + 2, r.Width - 4, r.Height - 4);
+            b.Draw(Game1.staminaRect, inner, i < filled && !locked ? new Color(255, 211, 66) : c);
+        }
+    }
+
+    private bool IsSelected(string id, string group)
+    {
+        if (group == "ohgi")
+            return Data.SelectedOhgi == id[^1].ToString();
+
+        if (group == "ultimate")
+            return Data.SelectedUltimate == id[^1].ToString();
+
+        return false;
+    }
+
+    private bool IsLocked(string id, string group)
+    {
+        if (group == "basic")
+            return false;
+
+        string branch = id[^1].ToString();
+
+        if (group == "ohgi")
+        {
+            if (!Data.OhgiAccessGranted)
+                return true;
+
+            if (Data.SelectedOhgi is not null)
+                return Data.SelectedOhgi != branch;
+
+            string requiredBasic = $"Basic{branch}";
+            return !Data.Skills[requiredBasic].IsMastered;
         }
 
-        bool canPlus = group == "basic" || selected;
-        DrawButton(
-            b,
-            PlusButtons[id].bounds,
-            "+",
-            canPlus && !skill.IsMastered ? Color.DarkGreen : Color.Gray
-        );
+        if (!Data.UltimateAccessGranted)
+            return true;
+
+        if (Data.SelectedUltimate is not null)
+            return Data.SelectedUltimate != branch;
+
+        return false;
+    }
+
+    private void DrawLock(SpriteBatch b, Rectangle r)
+    {
+        Color dark = new Color(91, 58, 33);
+        Color gold = new Color(227, 169, 53);
+
+        Rectangle body = new(r.X + 3, r.Y + 10, r.Width - 6, r.Height - 10);
+        b.Draw(Game1.staminaRect, body, gold);
+
+        Rectangle hole = new(r.Center.X - 2, r.Y + 15, 4, 6);
+        b.Draw(Game1.staminaRect, hole, dark);
+
+        Rectangle left = new(r.X + 6, r.Y + 4, 4, 9);
+        Rectangle right = new(r.Right - 10, r.Y + 4, 4, 9);
+        Rectangle top = new(r.X + 9, r.Y + 2, r.Width - 18, 4);
+
+        b.Draw(Game1.staminaRect, left, gold);
+        b.Draw(Game1.staminaRect, right, gold);
+        b.Draw(Game1.staminaRect, top, gold);
     }
 
     private void DrawTooltip(SpriteBatch b, string id)
     {
         string title = SkillNames[id];
-        string subtitle = SkillSubtitles[id];
-        string[] desc = SkillDescriptions[id];
-        int current = Data.Skills[id].TotalPoints;
-        int max = 15;
+        string type = SkillTypes[id];
+        string[] lines = SkillDescriptions[id];
+        string state = GetStateText(id);
 
-        int x = xPositionOnScreen - 320;
-        int y = yPositionOnScreen + 110;
-        int w = 300;
-        int h = 210;
+        int tooltipWidth = 390;
+        int tooltipHeight = 150 + lines.Length * 27;
 
-        if (x < 16)
-            x = xPositionOnScreen + width + 16;
+        int x = HoverX + 26;
+        int y = HoverY + 24;
 
-        IClickableMenu.drawTextureBox(b, x, y, w, h, Color.White);
+        if (x + tooltipWidth > Game1.uiViewport.Width - 16)
+            x = HoverX - tooltipWidth - 22;
+
+        if (y + tooltipHeight > Game1.uiViewport.Height - 16)
+            y = Game1.uiViewport.Height - tooltipHeight - 16;
+
+        x = Math.Max(16, x);
+        y = Math.Max(16, y);
+
+        IClickableMenu.drawTextureBox(
+            b,
+            x,
+            y,
+            tooltipWidth,
+            tooltipHeight,
+            new Color(255, 245, 220)
+        );
+
+        Rectangle icon = new(x + 18, y + 18, 64, 64);
+        b.Draw(Icons[id], icon, IsLocked(id, GetGroup(id)) ? Color.White * 0.35f : Color.White);
 
         Utility.drawTextWithShadow(
             b,
             title,
             Game1.dialogueFont,
-            new Vector2(x + 18, y + 16),
-            Color.Goldenrod
+            new Vector2(x + 96, y + 13),
+            new Color(112, 68, 28)
         );
 
         Utility.drawTextWithShadow(
             b,
-            subtitle,
+            type,
             Game1.smallFont,
-            new Vector2(x + 18, y + 58),
-            Color.BurlyWood
+            new Vector2(x + 98, y + 58),
+            Color.DimGray
         );
 
-        int lineY = y + 90;
-        foreach (string line in desc)
+        int lineY = y + 92;
+        foreach (string line in lines)
         {
             Utility.drawTextWithShadow(
                 b,
@@ -511,35 +692,87 @@ internal sealed class SkillTreeMenu : IClickableMenu
                 new Vector2(x + 18, lineY),
                 Game1.textColor
             );
-            lineY += 26;
+            lineY += 27;
         }
 
         Utility.drawTextWithShadow(
             b,
-            $"현재 투자: {current} / {max}",
+            $"현재 투자: {Data.Skills[id].TotalPoints} / 15",
             Game1.smallFont,
-            new Vector2(x + 18, y + h - 34),
-            Color.Goldenrod
+            new Vector2(x + 18, tooltipHeight + y - 49),
+            new Color(126, 76, 31)
+        );
+
+        Utility.drawTextWithShadow(
+            b,
+            state,
+            Game1.smallFont,
+            new Vector2(x + 18, tooltipHeight + y - 25),
+            GetStateColor(id)
         );
     }
 
-    private static void DrawButton(SpriteBatch b, Rectangle bounds, string text, Color color)
+    private string GetGroup(string id)
     {
-        IClickableMenu.drawTextureBox(
-            b,
-            bounds.X,
-            bounds.Y,
-            bounds.Width,
-            bounds.Height,
-            Color.White
-        );
+        if (id.StartsWith("Ohgi"))
+            return "ohgi";
 
-        Vector2 size = Game1.smallFont.MeasureString(text);
-        Vector2 pos = new(
-            bounds.Center.X - size.X / 2f,
-            bounds.Center.Y - size.Y / 2f
-        );
+        if (id.StartsWith("Ultimate"))
+            return "ultimate";
 
-        Utility.drawTextWithShadow(b, text, Game1.smallFont, pos, color);
+        return "basic";
+    }
+
+    private string GetStateText(string id)
+    {
+        string group = GetGroup(id);
+
+        if (group == "basic")
+            return Data.Skills[id].IsMastered ? "MASTER" : "클릭: SP 1 투자";
+
+        string branch = id[^1].ToString();
+
+        if (group == "ohgi")
+        {
+            if (!Data.OhgiAccessGranted)
+                return "잠김: 오의 해방 필요";
+
+            if (Data.SelectedOhgi is null)
+            {
+                if (!Data.Skills[$"Basic{branch}"].IsMastered)
+                    return $"잠김: 기본 스킬 {branch} MASTER 필요";
+
+                return "클릭: 이 오의를 선택";
+            }
+
+            if (Data.SelectedOhgi == branch)
+                return Data.Skills[id].IsMastered ? "선택됨 · MASTER" : "선택됨 · 클릭: SP 1 투자";
+
+            return "선택 불가: 다른 오의가 확정됨";
+        }
+
+        if (!Data.UltimateAccessGranted)
+            return "잠김: 극의 해방 필요";
+
+        if (Data.SelectedUltimate is null)
+            return "클릭: 이 극의를 선택";
+
+        if (Data.SelectedUltimate == branch)
+            return Data.Skills[id].IsMastered ? "선택됨 · MASTER" : "선택됨 · 클릭: SP 1 투자";
+
+        return "선택 불가: 다른 극의가 확정됨";
+    }
+
+    private Color GetStateColor(string id)
+    {
+        string state = GetStateText(id);
+
+        if (state.StartsWith("잠김") || state.StartsWith("선택 불가"))
+            return Color.Gray;
+
+        if (state.Contains("선택됨") || state.Contains("MASTER"))
+            return Color.DarkGreen;
+
+        return Color.DarkSlateBlue;
     }
 }

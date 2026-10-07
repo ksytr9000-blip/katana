@@ -6,6 +6,7 @@ using StardewValley;
 using SwordMastery.Models;
 using SwordMastery.Services;
 using SwordMastery.UI;
+using SwordMastery.Integrations;
 
 namespace SwordMastery;
 
@@ -24,6 +25,7 @@ internal sealed class ModEntry : Mod
         Progression = new ProgressionService(Config);
         Skills = new SkillService();
 
+        helper.Events.GameLoop.GameLaunched += OnGameLaunched;
         helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
         helper.Events.GameLoop.Saving += OnSaving;
         helper.Events.GameLoop.DayStarted += OnDayStarted;
@@ -40,6 +42,52 @@ internal sealed class ModEntry : Mod
         helper.ConsoleCommands.Add("sm_reset", "Pay the configured gold cost and schedule respec for next morning.", CommandReset);
 
         Monitor.Log("Sword Mastery prototype loaded.", LogLevel.Info);
+    }
+
+    private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
+    {
+        IGenericModConfigMenuApi? gmcm =
+            Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+
+        if (gmcm is null)
+        {
+            Monitor.Log(
+                "Generic Mod Config Menu not found. In-game config menu integration is disabled.",
+                LogLevel.Trace
+            );
+            return;
+        }
+
+        gmcm.Register(
+            mod: ModManifest,
+            reset: () => Config = new ModConfig(),
+            save: () => Helper.WriteConfig(Config)
+        );
+
+        gmcm.AddSectionTitle(
+            mod: ModManifest,
+            text: () => "검술 모드 설정"
+        );
+
+        gmcm.AddKeybind(
+            mod: ModManifest,
+            getValue: () => Config.OpenMenuKey,
+            setValue: value => Config.OpenMenuKey = value,
+            name: () => "검술창 열기 키",
+            tooltip: () => "검술 레벨과 스킬 배분창을 열고 닫는 키입니다.",
+            fieldId: "OpenMenuKey"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => Config.ShowHud,
+            setValue: value => Config.ShowHud = value,
+            name: () => "검술 HUD 표시",
+            tooltip: () => "화면 왼쪽 위의 검술 레벨 / EXP / SP 표시를 켜거나 끕니다.",
+            fieldId: "ShowHud"
+        );
+
+        Monitor.Log("Generic Mod Config Menu integration registered.", LogLevel.Info);
     }
 
     private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
@@ -60,7 +108,7 @@ internal sealed class ModEntry : Mod
             return;
 
         Skills.UpdateUnlockState(Data);
-        Game1.activeClickableMenu = new SkillTreeMenu(Data, Config, Progression, Skills);
+        Game1.activeClickableMenu = new SkillTreeMenu(Data, Config, Progression, Skills, Helper);
         Game1.playSound("bigSelect");
     }
 
