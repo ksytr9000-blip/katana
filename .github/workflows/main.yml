@@ -1,0 +1,44 @@
+name: Build SwordMastery
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch code
+        uses: actions/checkout@v4
+
+      - name: Add Stardew/SMAPI build environment
+        uses: Pathoschild/SMAPI-ModBuildWorkflow/add-build-environment@v1
+        with:
+          dotnet_version: 6.0.x
+          force_build_with_dotnet_version: true
+
+      - name: Restore
+        run: dotnet restore SwordMastery.csproj
+
+      - name: Build
+        run: dotnet build SwordMastery.csproj --configuration Release --no-restore
+
+      - name: Make install folder
+        shell: bash
+        run: |
+          set -e
+          mkdir -p package/SwordMastery
+          cp bin/Release/net6.0/SwordMastery.dll package/SwordMastery/
+          cp manifest.json package/SwordMastery/
+          cp -r assets package/SwordMastery/
+          cp -r i18n package/SwordMastery/
+          cd package
+          zip -r ../SwordMastery-Install.zip SwordMastery
+
+      - name: Upload Android-PC install ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwordMastery-Install
+          path: SwordMastery-Install.zip
+          if-no-files-found: error
