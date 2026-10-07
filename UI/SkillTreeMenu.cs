@@ -237,6 +237,11 @@ internal sealed class SkillTreeMenu : IClickableMenu
             bool ok = false;
             string message;
 
+            bool prevOhgiQuest = Data.OhgiQuestAvailable;
+            bool prevUltimateQuest = Data.UltimateQuestAvailable;
+            bool prevOhgiAccess = Data.OhgiAccessGranted;
+            bool prevUltimateAccess = Data.UltimateAccessGranted;
+
             if (id.StartsWith("Basic"))
             {
                 ok = Skills.TryAllocateBasic(Data, id[^1].ToString(), out message);
@@ -287,6 +292,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             if (ok)
             {
                 Skills.UpdateUnlockState(Data);
+                ShowUnlockNotifications(prevOhgiQuest, prevUltimateQuest, prevOhgiAccess, prevUltimateAccess);
                 Game1.playSound("coin");
             }
             else
@@ -297,6 +303,33 @@ internal sealed class SkillTreeMenu : IClickableMenu
             Game1.addHUDMessage(new HUDMessage(message));
             return;
         }
+    }
+
+
+    private void ShowUnlockNotifications(
+        bool prevOhgiQuest,
+        bool prevUltimateQuest,
+        bool prevOhgiAccess,
+        bool prevUltimateAccess
+    )
+    {
+        if (!prevOhgiQuest && Data.OhgiQuestAvailable)
+        {
+            Game1.addHUDMessage(new HUDMessage("오의 해방 퀘스트가 생겼습니다.", HUDMessage.newQuest_type));
+            Game1.playSound("questcomplete");
+        }
+
+        if (!prevUltimateQuest && Data.UltimateQuestAvailable)
+        {
+            Game1.addHUDMessage(new HUDMessage("극의 해방 퀘스트가 생겼습니다.", HUDMessage.newQuest_type));
+            Game1.playSound("questcomplete");
+        }
+
+        if (!prevOhgiAccess && Data.OhgiAccessGranted)
+            Game1.addHUDMessage(new HUDMessage("오의가 해방되었습니다.", HUDMessage.newQuest_type));
+
+        if (!prevUltimateAccess && Data.UltimateAccessGranted)
+            Game1.addHUDMessage(new HUDMessage("극의가 해방되었습니다.", HUDMessage.newQuest_type));
     }
 
     public override void draw(SpriteBatch b)

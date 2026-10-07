@@ -1,24 +1,26 @@
-SwordMastery combined fix patch
+SwordMastery Unlock Popup PATCH
 
-이 패치에는 둘 다 포함됩니다.
+1차 작업: 해금 순간 팝업 알림 추가
 
-1. UI 수정
-- EXP 바 길이 축소
-- 오의/극의 선택 안내문 제거
-- I / II / III 줄 간격 확대
+교체할 파일:
+- ModEntry.cs
+- UI/SkillTreeMenu.cs
 
-2. GMCM 오류 수정
-- IGenericModConfigMenuApi를 public interface로 수정
-- 'must be a public interface' 오류 해결
+이번 패치에서 추가되는 것:
+- 기본 스킬 2개 마스터 시:
+  "오의 해방 퀘스트가 생겼습니다." HUD 알림
+- 기본 스킬 3개 + 선택 오의 마스터 시:
+  "극의 해방 퀘스트가 생겼습니다." HUD 알림
+- 오의 실제 해방 시:
+  "오의가 해방되었습니다." HUD 알림
+- 극의 실제 해방 시:
+  "극의가 해방되었습니다." HUD 알림
 
-GitHub에 올릴 것:
-UI/
-  SkillTreeMenu.cs
+UI 클릭으로 포인트를 투자했을 때도 뜨고,
+콘솔 명령/디버그 해방에서도 뜨게 처리함.
 
-Integrations/
-  IGenericModConfigMenuApi.cs
-
-두 폴더째 그대로 업로드/덮어쓰기
--> Commit changes
+적용:
+GitHub에서 파일 2개 덮어쓰기
+-> Commit
 -> Actions 빌드
--> 새 Artifact 교체
+-> 새 Artifact로 SwordMastery 교체

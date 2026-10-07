@@ -107,7 +107,7 @@ internal sealed class ModEntry : Mod
         if (Game1.activeClickableMenu is not null)
             return;
 
-        Skills.UpdateUnlockState(Data);
+        RefreshUnlockState(showMessages: false);
         Game1.activeClickableMenu = new SkillTreeMenu(Data, Config, Progression, Skills, Helper);
         Game1.playSound("bigSelect");
     }
@@ -160,7 +160,7 @@ internal sealed class ModEntry : Mod
 
             if (levels > 0)
             {
-                Skills.UpdateUnlockState(Data);
+                RefreshUnlockState(showMessages: true);
 
                 Game1.addHUDMessage(new HUDMessage(
                     Helper.Translation.Get("level.up", new { level = Data.SwordLevel }),
@@ -172,6 +172,48 @@ internal sealed class ModEntry : Mod
         {
             Data.LastObservedMonsterKills = currentKills;
         }
+    }
+
+    private void RefreshUnlockState(bool showMessages)
+    {
+        bool prevOhgiQuest = Data.OhgiQuestAvailable;
+        bool prevUltimateQuest = Data.UltimateQuestAvailable;
+        bool prevOhgiAccess = Data.OhgiAccessGranted;
+        bool prevUltimateAccess = Data.UltimateAccessGranted;
+
+        Skills.UpdateUnlockState(Data);
+
+        if (showMessages)
+            NotifyUnlockChanges(prevOhgiQuest, prevUltimateQuest, prevOhgiAccess, prevUltimateAccess);
+    }
+
+    private void NotifyUnlockChanges(
+        bool prevOhgiQuest,
+        bool prevUltimateQuest,
+        bool prevOhgiAccess,
+        bool prevUltimateAccess
+    )
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        if (!prevOhgiQuest && Data.OhgiQuestAvailable)
+        {
+            Game1.addHUDMessage(new HUDMessage("오의 해방 퀘스트가 생겼습니다.", HUDMessage.newQuest_type));
+            Game1.playSound("questcomplete");
+        }
+
+        if (!prevUltimateQuest && Data.UltimateQuestAvailable)
+        {
+            Game1.addHUDMessage(new HUDMessage("극의 해방 퀘스트가 생겼습니다.", HUDMessage.newQuest_type));
+            Game1.playSound("questcomplete");
+        }
+
+        if (!prevOhgiAccess && Data.OhgiAccessGranted)
+            Game1.addHUDMessage(new HUDMessage("오의가 해방되었습니다.", HUDMessage.newQuest_type));
+
+        if (!prevUltimateAccess && Data.UltimateAccessGranted)
+            Game1.addHUDMessage(new HUDMessage("극의가 해방되었습니다.", HUDMessage.newQuest_type));
     }
 
     private void OnRenderedHud(object? sender, RenderedHudEventArgs e)
@@ -259,7 +301,7 @@ internal sealed class ModEntry : Mod
         }
 
         if (ok)
-            Skills.UpdateUnlockState(Data);
+            RefreshUnlockState(showMessages: true);
 
         Monitor.Log(message, ok ? LogLevel.Info : LogLevel.Warn);
     }
@@ -284,13 +326,25 @@ internal sealed class ModEntry : Mod
 
     private void CommandGrantOhgi(string command, string[] args)
     {
+        bool prevOhgiQuest = Data.OhgiQuestAvailable;
+        bool prevUltimateQuest = Data.UltimateQuestAvailable;
+        bool prevOhgiAccess = Data.OhgiAccessGranted;
+        bool prevUltimateAccess = Data.UltimateAccessGranted;
+
         Skills.GrantOhgiAccess(Data);
+        NotifyUnlockChanges(prevOhgiQuest, prevUltimateQuest, prevOhgiAccess, prevUltimateAccess);
         Monitor.Log("DEBUG: Ohgi access granted.", LogLevel.Info);
     }
 
     private void CommandGrantUltimate(string command, string[] args)
     {
+        bool prevOhgiQuest = Data.OhgiQuestAvailable;
+        bool prevUltimateQuest = Data.UltimateQuestAvailable;
+        bool prevOhgiAccess = Data.OhgiAccessGranted;
+        bool prevUltimateAccess = Data.UltimateAccessGranted;
+
         Skills.GrantUltimateAccess(Data);
+        NotifyUnlockChanges(prevOhgiQuest, prevUltimateQuest, prevOhgiAccess, prevUltimateAccess);
         Monitor.Log("DEBUG: Ultimate access granted.", LogLevel.Info);
     }
 
