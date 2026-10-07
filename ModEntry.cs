@@ -45,10 +45,8 @@ internal sealed class ModEntry : Mod
         Data = Helper.Data.ReadSaveData<SaveData>(SaveKey) ?? new SaveData();
         Data.EnsureSkillKeys();
 
-        int currentKills = Convert.ToInt32(Game1.player.stats.Get(StatKeys.MonstersKilled));
+        int currentKills = Convert.ToInt32(Game1.player.stats.MonstersKilled);
 
-        // Installing this mod into an old save should not retroactively grant XP
-        // for every monster killed before the mod was installed.
         if (!Data.KillCounterInitialized)
         {
             Data.LastObservedMonsterKills = currentKills;
@@ -80,7 +78,7 @@ internal sealed class ModEntry : Mod
         if (!Context.IsWorldReady || !e.IsMultipleOf(15))
             return;
 
-        int currentKills = Convert.ToInt32(Game1.player.stats.Get(StatKeys.MonstersKilled));
+        int currentKills = Convert.ToInt32(Game1.player.stats.MonstersKilled);
         int gainedKills = currentKills - Data.LastObservedMonsterKills;
 
         if (gainedKills > 0)
@@ -100,7 +98,6 @@ internal sealed class ModEntry : Mod
         }
         else if (gainedKills < 0)
         {
-            // Safety for unusual save/stat changes.
             Data.LastObservedMonsterKills = currentKills;
         }
     }
