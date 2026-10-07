@@ -16,19 +16,93 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
     private readonly Dictionary<string, ClickableComponent> PlusButtons = new();
     private readonly Dictionary<string, ClickableComponent> SelectButtons = new();
+    private readonly Dictionary<string, ClickableComponent> RowAreas = new();
+
+    private string? HoveredSkillId;
 
     private readonly Dictionary<string, string> SkillNames = new()
     {
-        ["BasicA"] = "A. 검사의 발걸음",
-        ["BasicB"] = "B. 참격",
-        ["BasicC"] = "C. 칼리코류 검술",
+        ["BasicA"] = "검사의 발걸음",
+        ["BasicB"] = "참격",
+        ["BasicC"] = "칼리코류 검술",
 
-        ["OhgiA"] = "A. 일섬",
-        ["OhgiB"] = "B. 검기",
-        ["OhgiC"] = "C. 검술의 정점",
+        ["OhgiA"] = "일섬",
+        ["OhgiB"] = "검기",
+        ["OhgiC"] = "검술의 정점",
 
-        ["UltimateA"] = "A. 검술의 극",
-        ["UltimateB"] = "B. 보법의 극"
+        ["UltimateA"] = "검술의 극",
+        ["UltimateB"] = "보법의 극"
+    };
+
+    private readonly Dictionary<string, string> SkillSubtitles = new()
+    {
+        ["BasicA"] = "기본 스킬 A",
+        ["BasicB"] = "기본 스킬 B",
+        ["BasicC"] = "기본 스킬 C",
+
+        ["OhgiA"] = "오의 A",
+        ["OhgiB"] = "오의 B",
+        ["OhgiC"] = "오의 C",
+
+        ["UltimateA"] = "극의 A",
+        ["UltimateB"] = "극의 B"
+    };
+
+    private readonly Dictionary<string, string[]> SkillDescriptions = new()
+    {
+        ["BasicA"] = new[]
+        {
+            "1단계: 전방으로 대쉬",
+            "2단계: 대쉬 경로에 1회 베기",
+            "3단계: 대쉬 경로에 다회 베기"
+        },
+        ["BasicB"] = new[]
+        {
+            "1단계: 전방 베기",
+            "2단계: 전방 넓은 범위 베기",
+            "3단계: 직선 검기 발생"
+        },
+        ["BasicC"] = new[]
+        {
+            "1단계: 전방 3회 베기",
+            "2단계: 전방 180도 4회 베기",
+            "3단계: 전방 180도 6회 베기"
+        },
+        ["OhgiA"] = new[]
+        {
+            "기본스킬 A 마스터 필요",
+            "1단계: 경로상 모든 적 강타",
+            "2단계: 경로 폭 증가",
+            "3단계: 경로 폭 대폭 증가"
+        },
+        ["OhgiB"] = new[]
+        {
+            "기본스킬 B 마스터 필요",
+            "1단계: 기본 공격 검기화",
+            "2단계: 사거리/폭 증가",
+            "3단계: 무한 사거리·전 관통"
+        },
+        ["OhgiC"] = new[]
+        {
+            "기본스킬 C 마스터 필요",
+            "1단계: 전방위 3회 타격",
+            "2단계: 범위 증가 + 6회",
+            "3단계: 범위 증가 + 10회"
+        },
+        ["UltimateA"] = new[]
+        {
+            "주변 적 자동 참격 패시브",
+            "1단계: 작은 범위·약한 피해",
+            "2단계: 중간 범위·보통 피해",
+            "3단계: 큰 범위·강한 피해"
+        },
+        ["UltimateB"] = new[]
+        {
+            "무제한 이동기 + 주변 검격",
+            "1단계: 짧은 거리·약한 피해",
+            "2단계: 중간 거리·보통 피해",
+            "3단계: 긴 거리·강한 피해"
+        }
     };
 
     public SkillTreeMenu(
@@ -57,49 +131,84 @@ internal sealed class SkillTreeMenu : IClickableMenu
     {
         PlusButtons.Clear();
         SelectButtons.Clear();
+        RowAreas.Clear();
 
         int rowY = yPositionOnScreen + 126;
 
-        AddPlus("BasicA", rowY);
+        AddRow("BasicA", rowY, false);
         rowY += 52;
-        AddPlus("BasicB", rowY);
+        AddRow("BasicB", rowY, false);
         rowY += 52;
-        AddPlus("BasicC", rowY);
+        AddRow("BasicC", rowY, false);
 
         rowY += 78;
 
-        AddSelect("OhgiA", rowY);
-        AddPlus("OhgiA", rowY);
+        AddRow("OhgiA", rowY, true);
         rowY += 52;
-        AddSelect("OhgiB", rowY);
-        AddPlus("OhgiB", rowY);
+        AddRow("OhgiB", rowY, true);
         rowY += 52;
-        AddSelect("OhgiC", rowY);
-        AddPlus("OhgiC", rowY);
+        AddRow("OhgiC", rowY, true);
 
         rowY += 78;
 
-        AddSelect("UltimateA", rowY);
-        AddPlus("UltimateA", rowY);
+        AddRow("UltimateA", rowY, true);
         rowY += 52;
-        AddSelect("UltimateB", rowY);
-        AddPlus("UltimateB", rowY);
+        AddRow("UltimateB", rowY, true);
     }
 
-    private void AddPlus(string id, int y)
+    private void AddRow(string id, int y, bool hasSelect)
     {
+        RowAreas[id] = new ClickableComponent(
+            new Rectangle(xPositionOnScreen + 30, y, width - 60, 46),
+            id
+        );
+
+        if (hasSelect)
+        {
+            SelectButtons[id] = new ClickableComponent(
+                new Rectangle(xPositionOnScreen + width - 210, y + 4, 112, 40),
+                id
+            );
+        }
+
         PlusButtons[id] = new ClickableComponent(
             new Rectangle(xPositionOnScreen + width - 86, y + 4, 46, 40),
             id
         );
     }
 
-    private void AddSelect(string id, int y)
+    public override void performHoverAction(int x, int y)
     {
-        SelectButtons[id] = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + width - 210, y + 4, 112, 40),
-            id
-        );
+        base.performHoverAction(x, y);
+
+        HoveredSkillId = null;
+
+        foreach (var pair in RowAreas)
+        {
+            if (pair.Value.containsPoint(x, y))
+            {
+                HoveredSkillId = pair.Key;
+                return;
+            }
+        }
+
+        foreach (var pair in SelectButtons)
+        {
+            if (pair.Value.containsPoint(x, y))
+            {
+                HoveredSkillId = pair.Key;
+                return;
+            }
+        }
+
+        foreach (var pair in PlusButtons)
+        {
+            if (pair.Value.containsPoint(x, y))
+            {
+                HoveredSkillId = pair.Key;
+                return;
+            }
+        }
     }
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
@@ -226,11 +335,11 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         DrawSectionTitle(b, "기본 스킬", rowY);
         rowY += 26;
-        DrawSkillRow(b, "BasicA", rowY, SkillNames["BasicA"], "basic");
+        DrawSkillRow(b, "BasicA", rowY, "A", "basic");
         rowY += 52;
-        DrawSkillRow(b, "BasicB", rowY, SkillNames["BasicB"], "basic");
+        DrawSkillRow(b, "BasicB", rowY, "B", "basic");
         rowY += 52;
-        DrawSkillRow(b, "BasicC", rowY, SkillNames["BasicC"], "basic");
+        DrawSkillRow(b, "BasicC", rowY, "C", "basic");
 
         rowY += 58;
         string ohgiState = Data.OhgiAccessGranted
@@ -238,11 +347,11 @@ internal sealed class SkillTreeMenu : IClickableMenu
             : Data.OhgiQuestAvailable ? "해방 퀘스트 가능" : "잠김";
         DrawSectionTitle(b, $"오의  —  {ohgiState}", rowY);
         rowY += 26;
-        DrawSkillRow(b, "OhgiA", rowY, SkillNames["OhgiA"], "ohgi");
+        DrawSkillRow(b, "OhgiA", rowY, "A", "ohgi");
         rowY += 52;
-        DrawSkillRow(b, "OhgiB", rowY, SkillNames["OhgiB"], "ohgi");
+        DrawSkillRow(b, "OhgiB", rowY, "B", "ohgi");
         rowY += 52;
-        DrawSkillRow(b, "OhgiC", rowY, SkillNames["OhgiC"], "ohgi");
+        DrawSkillRow(b, "OhgiC", rowY, "C", "ohgi");
 
         rowY += 58;
         string ultimateState = Data.UltimateAccessGranted
@@ -250,17 +359,20 @@ internal sealed class SkillTreeMenu : IClickableMenu
             : Data.UltimateQuestAvailable ? "해방 퀘스트 가능" : "잠김";
         DrawSectionTitle(b, $"극의  —  {ultimateState}", rowY);
         rowY += 26;
-        DrawSkillRow(b, "UltimateA", rowY, SkillNames["UltimateA"], "ultimate");
+        DrawSkillRow(b, "UltimateA", rowY, "A", "ultimate");
         rowY += 52;
-        DrawSkillRow(b, "UltimateB", rowY, SkillNames["UltimateB"], "ultimate");
+        DrawSkillRow(b, "UltimateB", rowY, "B", "ultimate");
 
         Utility.drawTextWithShadow(
             b,
-            $"[{Config.OpenMenuKey}] 닫기  ·  각 단계 5P  ·  단계 완료 시 다음 단계 활성화",
+            $"[{Config.OpenMenuKey}] 닫기  ·  기술 이름은 마우스를 올리면 표시",
             Game1.smallFont,
             new Vector2(left, yPositionOnScreen + height - 40),
             Color.DimGray
         );
+
+        if (!string.IsNullOrEmpty(HoveredSkillId))
+            DrawTooltip(b, HoveredSkillId!);
 
         upperRightCloseButton?.draw(b);
         drawMouse(b);
@@ -277,24 +389,24 @@ internal sealed class SkillTreeMenu : IClickableMenu
         );
     }
 
-    private void DrawSkillRow(SpriteBatch b, string id, int y, string title, string group)
+    private void DrawSkillRow(SpriteBatch b, string id, int y, string badgeText, string group)
     {
         var skill = Data.Skills[id];
 
-        Rectangle row = new(
-            xPositionOnScreen + 30,
-            y,
-            width - 60,
-            46
-        );
+        Rectangle row = RowAreas[id].bounds;
+        bool hovered = HoveredSkillId == id;
 
-        b.Draw(Game1.staminaRect, row, Color.Black * 0.08f);
+        b.Draw(Game1.staminaRect, row, hovered ? Color.Goldenrod * 0.14f : Color.Black * 0.08f);
 
+        Rectangle badge = new(row.X + 8, row.Y + 5, 36, 36);
+        IClickableMenu.drawTextureBox(b, badge.X, badge.Y, badge.Width, badge.Height, Color.White);
+
+        Vector2 badgeSize = Game1.smallFont.MeasureString(badgeText);
         Utility.drawTextWithShadow(
             b,
-            title,
+            badgeText,
             Game1.smallFont,
-            new Vector2(row.X + 12, row.Y + 12),
+            new Vector2(badge.Center.X - badgeSize.X / 2f, badge.Center.Y - badgeSize.Y / 2f),
             Game1.textColor
         );
 
@@ -303,7 +415,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             progress,
             Game1.smallFont,
-            new Vector2(row.X + 245, row.Y + 12),
+            new Vector2(row.X + 64, row.Y + 12),
             skill.IsMastered ? Color.DarkGreen : Game1.textColor
         );
 
@@ -352,6 +464,62 @@ internal sealed class SkillTreeMenu : IClickableMenu
             PlusButtons[id].bounds,
             "+",
             canPlus && !skill.IsMastered ? Color.DarkGreen : Color.Gray
+        );
+    }
+
+    private void DrawTooltip(SpriteBatch b, string id)
+    {
+        string title = SkillNames[id];
+        string subtitle = SkillSubtitles[id];
+        string[] desc = SkillDescriptions[id];
+        int current = Data.Skills[id].TotalPoints;
+        int max = 15;
+
+        int x = xPositionOnScreen - 320;
+        int y = yPositionOnScreen + 110;
+        int w = 300;
+        int h = 210;
+
+        if (x < 16)
+            x = xPositionOnScreen + width + 16;
+
+        IClickableMenu.drawTextureBox(b, x, y, w, h, Color.White);
+
+        Utility.drawTextWithShadow(
+            b,
+            title,
+            Game1.dialogueFont,
+            new Vector2(x + 18, y + 16),
+            Color.Goldenrod
+        );
+
+        Utility.drawTextWithShadow(
+            b,
+            subtitle,
+            Game1.smallFont,
+            new Vector2(x + 18, y + 58),
+            Color.BurlyWood
+        );
+
+        int lineY = y + 90;
+        foreach (string line in desc)
+        {
+            Utility.drawTextWithShadow(
+                b,
+                line,
+                Game1.smallFont,
+                new Vector2(x + 18, lineY),
+                Game1.textColor
+            );
+            lineY += 26;
+        }
+
+        Utility.drawTextWithShadow(
+            b,
+            $"현재 투자: {current} / {max}",
+            Game1.smallFont,
+            new Vector2(x + 18, y + h - 34),
+            Color.Goldenrod
         );
     }
 
