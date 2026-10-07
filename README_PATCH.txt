@@ -1,42 +1,24 @@
-SwordMastery v0.3 REAL UI + GMCM PATCH
-======================================
+SwordMastery combined fix patch
 
-이 패치는 실제 게임 UI를 아이콘형으로 교체합니다.
-이전의 줄형 개발 UI를 완전히 대체합니다.
+이 패치에는 둘 다 포함됩니다.
 
-GitHub 저장소 루트에 그대로 업로드/덮어쓰기:
-- ModEntry.cs
-- UI/SkillTreeMenu.cs
-- Integrations/IGenericModConfigMenuApi.cs
-- assets/icons/basic_a.png
-- assets/icons/basic_b.png
-- assets/icons/basic_c.png
-- assets/icons/ohgi_a.png
-- assets/icons/ohgi_b.png
-- assets/icons/ohgi_c.png
-- assets/icons/ultimate_a.png
-- assets/icons/ultimate_b.png
+1. UI 수정
+- EXP 바 길이 축소
+- 오의/극의 선택 안내문 제거
+- I / II / III 줄 간격 확대
 
-주의:
-assets 폴더 자체를 없애는 게 아니라 기존 assets 안에 icons 폴더를 추가하면 됩니다.
-기존 assets/skills.json은 그대로 남겨두세요.
+2. GMCM 오류 수정
+- IGenericModConfigMenuApi를 public interface로 수정
+- 'must be a public interface' 오류 해결
 
-UI 규칙:
-- 기본 스킬 3개: 서로 독립. 화살표 없음.
-- 오의 3개: 1개만 선택 가능.
-- 오의 선택 후 나머지 2개는 잠금.
-- 극의 2개: 1개만 선택 가능.
-- 극의 선택 후 나머지 1개는 잠금.
-- 기술명은 상시 노출하지 않음.
-- 마우스 올렸을 때만 이름/설명/현재 투자/잠금 상태 툴팁 표시.
-- 아이콘 클릭:
-  기본기 = SP 투자
-  오의/극의 미선택 상태 = 분기 선택
-  선택된 오의/극의 = SP 투자
+GitHub에 올릴 것:
+UI/
+  SkillTreeMenu.cs
 
-GMCM:
-- 검술창 열기 키 변경
-- 검술 HUD 표시 ON/OFF
+Integrations/
+  IGenericModConfigMenuApi.cs
 
-빌드:
-Commit -> Actions -> 새 Artifact 다운로드 -> SwordMastery 폴더 교체
+두 폴더째 그대로 업로드/덮어쓰기
+-> Commit changes
+-> Actions 빌드
+-> 새 Artifact 교체

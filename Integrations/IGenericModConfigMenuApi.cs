@@ -4,9 +4,9 @@ namespace SwordMastery.Integrations;
 
 /// <summary>
 /// Minimal Generic Mod Config Menu API used by Sword Mastery.
-/// This is copied as an interface only, so GMCM remains an optional dependency.
+/// GMCM is optional; Sword Mastery still works without it.
 /// </summary>
-internal interface IGenericModConfigMenuApi
+public interface IGenericModConfigMenuApi
 {
     void Register(
         IManifest mod,

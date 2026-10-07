@@ -163,7 +163,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
     private void AddSkillArea(string id, int x, int y, int tile)
     {
         SkillAreas[id] = new ClickableComponent(
-            new Rectangle(x, y, tile, tile + 62),
+            new Rectangle(x, y, tile, tile + 78),
             id
         );
     }
@@ -309,22 +309,6 @@ internal sealed class SkillTreeMenu : IClickableMenu
         DrawSectionLabel(b, "오의", yPositionOnScreen + 370);
         DrawSectionLabel(b, "극의", yPositionOnScreen + 585);
 
-        DrawBranchNote(
-            b,
-            Data.SelectedOhgi is null
-                ? "3가지 중 1가지만 선택할 수 있습니다."
-                : "선택한 오의 외의 분기는 잠겨 있습니다.",
-            yPositionOnScreen + 392
-        );
-
-        DrawBranchNote(
-            b,
-            Data.SelectedUltimate is null
-                ? "2가지 중 1가지만 선택할 수 있습니다."
-                : "선택한 극의 외의 분기는 잠겨 있습니다.",
-            yPositionOnScreen + 607
-        );
-
         DrawSkill(b, "BasicA", "basic");
         DrawSkill(b, "BasicB", "basic");
         DrawSkill(b, "BasicC", "basic");
@@ -401,7 +385,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             Game1.textColor
         );
 
-        Rectangle barBack = new(left + 350, yPositionOnScreen + 98, Math.Max(120, width - 650), 18);
+        Rectangle barBack = new(left + 260, yPositionOnScreen + 98, Math.Min(260, Math.Max(180, width - 760)), 18);
         b.Draw(Game1.staminaRect, barBack, new Color(94, 52, 28));
 
         float ratio = Data.SwordLevel >= Config.MaxSwordLevel
@@ -446,18 +430,6 @@ internal sealed class SkillTreeMenu : IClickableMenu
             Game1.smallFont,
             new Vector2(x + (w - size.X) / 2, y + 8),
             new Color(89, 48, 24)
-        );
-    }
-
-    private void DrawBranchNote(SpriteBatch b, string text, int y)
-    {
-        Vector2 size = Game1.smallFont.MeasureString(text);
-        Utility.drawTextWithShadow(
-            b,
-            text,
-            Game1.smallFont,
-            new Vector2(xPositionOnScreen + (width - size.X) / 2, y),
-            Color.DimGray
         );
     }
 
@@ -525,7 +497,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             );
         }
 
-        DrawStagePips(b, id, area.X + tile / 2, area.Y + tile + 10, locked);
+        DrawStagePips(b, id, area.X + tile / 2, area.Y + tile + 14, locked);
     }
 
     private void DrawStagePips(SpriteBatch b, string id, int centerX, int y, bool locked)
@@ -533,8 +505,8 @@ internal sealed class SkillTreeMenu : IClickableMenu
         SkillProgress p = Data.Skills[id];
 
         DrawPipRow(b, "I", p.Stage1, centerX, y, locked);
-        DrawPipRow(b, "II", p.Stage2, centerX, y + 17, locked);
-        DrawPipRow(b, "III", p.Stage3, centerX, y + 34, locked);
+        DrawPipRow(b, "II", p.Stage2, centerX, y + 24, locked);
+        DrawPipRow(b, "III", p.Stage3, centerX, y + 48, locked);
     }
 
     private void DrawPipRow(SpriteBatch b, string roman, int filled, int centerX, int y, bool locked)
