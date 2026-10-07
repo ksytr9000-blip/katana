@@ -1,0 +1,5 @@
+{
+  "level.up": "검술 레벨이 Lv.{{level}}이 되었습니다.",
+  "reset.scheduled": "{{cost}}G를 지불했습니다. 오늘 밤 검술 배분이 초기화됩니다.",
+  "reset.completed": "밤사이 검술의 가능성이 다시 불확실성으로 돌아갔습니다."
+}

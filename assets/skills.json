@@ -1,0 +1,120 @@
+{
+  "meta": {
+    "levelCap": 75,
+    "pointsPerLevel": 1,
+    "pointsPerStage": 5,
+    "stagesPerSkill": 3,
+    "damagePointBonus": 0.04
+  },
+  "basic": {
+    "A": {
+      "name": "검사의 발걸음",
+      "role": "movement",
+      "stages": [
+        "전방 대시",
+        "전방 대시 + 지나간 경로 1회 베기",
+        "전방 대시 + 지나간 경로 4회 베기"
+      ],
+      "prototypeCooldownSeconds": [
+        2.2,
+        1.9,
+        1.6
+      ]
+    },
+    "B": {
+      "name": "참격",
+      "role": "slash/projectile",
+      "stages": [
+        "전방 베기",
+        "전방 넓은 범위 베기",
+        "직선 검기 발생, 원거리 공격화"
+      ],
+      "prototypeCooldownSeconds": [
+        2.4,
+        2.4,
+        2.8
+      ]
+    },
+    "C": {
+      "name": "칼리코류 검술",
+      "role": "multi-hit",
+      "stages": [
+        "전방 3회 베기",
+        "전방 180도 넓은 범위 4회 베기",
+        "전방 180도 넓은 범위 6회 베기"
+      ],
+      "prototypeCooldownSeconds": [
+        4.0,
+        4.5,
+        5.0
+      ]
+    }
+  },
+  "ohgi": {
+    "A": {
+      "name": "일섬",
+      "requires": "BasicA mastered",
+      "stages": [
+        "전방 대시 후 경로상 모든 적에게 강력한 데미지",
+        "경로 폭 증가",
+        "경로 폭 대폭 증가"
+      ],
+      "prototypeCooldownSeconds": [
+        12.0,
+        11.0,
+        10.0
+      ]
+    },
+    "B": {
+      "name": "검기",
+      "requires": "BasicB mastered",
+      "passive": true,
+      "stages": [
+        "기본 공격에 짧고 좁은 검기, 1체 적중 시 소멸, 거리 감쇠",
+        "사거리/폭 증가, 최대 2체 관통, 거리/관통 감쇠",
+        "맵 끝까지 대형 검기, 전 몬스터 관통, 거리/관통 감쇠"
+      ]
+    },
+    "C": {
+      "name": "검술의 정점",
+      "requires": "BasicC mastered",
+      "stages": [
+        "전방위 3회 타격",
+        "범위 증가 + 6회 타격",
+        "범위 증가 + 10회 타격"
+      ],
+      "prototypeCooldownSeconds": [
+        14.0,
+        13.0,
+        12.0
+      ]
+    }
+  },
+  "ultimate": {
+    "A": {
+      "name": "검술의 극",
+      "concept": "공격 동작 자체가 사라진 경지",
+      "passive": true,
+      "stages": [
+        "작은 범위 / 작은 데미지",
+        "중간 범위 / 보통 데미지",
+        "조금 큰 범위 / 강한 데미지"
+      ],
+      "prototypeHitIntervalSeconds": [
+        0.8,
+        0.65,
+        0.5
+      ]
+    },
+    "B": {
+      "name": "보법의 극",
+      "concept": "이동 동작 자체가 사라진 경지",
+      "cooldownSeconds": 0,
+      "stages": [
+        "짧은 거리 / 작은 주변 검격",
+        "중간 거리 / 보통 주변 검격",
+        "긴 거리 / 강한 주변 검격"
+      ]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+1. 새 GitHub 저장소 생성
+2. 이 압축의 내용물을 전부 저장소 루트에 업로드
+3. 특히 .github/workflows/build.yml이 반드시 있어야 함
+4. Commit
+5. GitHub -> Actions -> Build SwordMastery
+6. 초록 체크 -> 아래 Artifacts -> SwordMastery-Install 다운로드
+7. 받은 Artifact를 풀고 SwordMastery-Install.zip도 다시 풀기
+8. 나온 SwordMastery 폴더를 Android Mods 폴더에 넣기
+
+Android Mods 경로:
+ /storage/emulated/0/Android/data/abc.smapi.gameloader/files/Mods/
+
+정상 로그:
+ Sword Mastery prototype loaded.
+
+첫 화면:
+ Sword Lv.0 EXP 0/40 SP:0

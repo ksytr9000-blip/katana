@@ -1,0 +1,9 @@
+{
+  "Name": "Sword Mastery",
+  "Author": "Prototype",
+  "Version": "0.1.0",
+  "Description": "Independent swordsmanship progression system for Stardew Valley.",
+  "UniqueID": "Prototype.SwordMastery",
+  "EntryDll": "SwordMastery.dll",
+  "MinimumApiVersion": "4.3.0"
+}
