@@ -885,13 +885,20 @@ internal sealed class CombatService
             // death/drop handling is preserved as much as possible.
             bool specialFinisherTarget =
                 monster is Mummy
-                || monster is ArmoredBug
+                || (
+                    monster is Bug
+                    && string.Equals(
+                        monster.Name,
+                        "Armored Bug",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 || monster is RockCrab;
 
             if (specialFinisherTarget
                 && Game1.currentLocation.characters.Contains(monster))
             {
-                Rectangle monsterBox = monster.GetBoundingBox();
+                Rectangle specialMonsterBox = monster.GetBoundingBox();
 
                 // Multiple passes cover revive / armor / shell state transitions.
                 for (int finishPass = 0; finishPass < 3; finishPass++)
@@ -906,7 +913,7 @@ internal sealed class CombatService
                         monster.ignoreDamageLOS.Value = true;
 
                         Game1.currentLocation.damageMonster(
-                            monsterBox,
+                            specialMonsterBox,
                             99999,
                             99999,
                             isBomb: true,
