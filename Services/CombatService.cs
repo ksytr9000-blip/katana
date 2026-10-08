@@ -1527,7 +1527,7 @@ internal sealed class CombatService
                     break;
                 }
 
-                if (obj.performToolAction(tool, location))
+                if (obj.performToolAction(tool))
                 {
                     location.objects.Remove(tile);
                     destroyed = true;
