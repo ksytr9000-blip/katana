@@ -123,23 +123,18 @@ internal sealed class SkillService
 
     public void UpdateUnlockState(SaveData data)
     {
-        int basicMasterCount = 0;
-        foreach (string id in new[] { "BasicA", "BasicB", "BasicC" })
-        {
-            if (data.Skills[id].IsMastered)
-                basicMasterCount++;
-        }
+        // Unlock quests are now driven by Sword Mastery level.
+        // Completing the quest grants the consumable unlock item; access itself
+        // is still permanently granted only when that item is used.
+        data.OhgiQuestAvailable =
+            !data.OhgiAccessGranted
+            && !data.OhgiQuestCompleted
+            && data.SwordLevel >= 30;
 
-        if (!data.OhgiAccessGranted && basicMasterCount >= 2)
-            data.OhgiQuestAvailable = true;
-
-        bool allBasicMastered = basicMasterCount == 3;
-        bool selectedOhgiMastered =
-            data.SelectedOhgi is not null
-            && data.Skills[OhgiSkillIds[data.SelectedOhgi]].IsMastered;
-
-        if (!data.UltimateAccessGranted && allBasicMastered && selectedOhgiMastered)
-            data.UltimateQuestAvailable = true;
+        data.UltimateQuestAvailable =
+            !data.UltimateAccessGranted
+            && !data.UltimateQuestCompleted
+            && data.SwordLevel >= 50;
     }
 
     public void GrantOhgiAccess(SaveData data)

@@ -664,7 +664,10 @@ internal sealed class SkillTreeMenu : IClickableMenu
         );
 
         int contentWidth = tooltipWidth - 44;
-        int descriptionWidth = Math.Max(220, contentWidth - 142);
+
+        // Reserve clear columns for the roman stage label and [0/5] counter.
+        // This prevents I / II / III from colliding with the investment text.
+        int descriptionWidth = Math.Max(180, contentWidth - 210);
 
         string[] wrapped = new string[3];
         int[] rowHeights = new int[3];
@@ -918,7 +921,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             roman,
             Game1.smallFont,
-            new Vector2(row.X + 10, row.Y + 8),
+            new Vector2(row.X + 14, row.Y + 8),
             invested > 0
                 ? new Color(106, 63, 28)
                 : Color.DimGray
@@ -928,7 +931,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             $"{invested}/5",
             Game1.smallFont,
-            new Vector2(row.X + 48, row.Y + 8),
+            new Vector2(row.X + 104, row.Y + 8),
             invested >= 5
                 ? new Color(45, 110, 46)
                 : new Color(109, 77, 48)
@@ -938,7 +941,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             wrappedDescription,
             Game1.smallFont,
-            new Vector2(row.X + 114, row.Y + 8),
+            new Vector2(row.X + 184, row.Y + 8),
             Game1.textColor
         );
     }

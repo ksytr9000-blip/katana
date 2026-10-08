@@ -31,6 +31,15 @@ internal sealed class SaveData
     public bool OhgiQuestAvailable { get; set; }
     public bool UltimateQuestAvailable { get; set; }
 
+    // Unlock quest state/progress.
+    public bool OhgiQuestStarted { get; set; }
+    public bool OhgiQuestCompleted { get; set; }
+    public int OhgiSkullKills { get; set; }
+
+    public bool UltimateQuestStarted { get; set; }
+    public bool UltimateQuestCompleted { get; set; }
+    public int UltimateDragonKills { get; set; }
+
     public bool PendingNightReset { get; set; }
 
     public static Dictionary<string, SkillProgress> CreateDefaultSkills()

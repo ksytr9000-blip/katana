@@ -1,9 +1,11 @@
+using System.Reflection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.GameData.Objects;
+using StardewValley.Monsters;
 using SwordMastery.Models;
 using SwordMastery.Services;
 using SwordMastery.UI;
@@ -17,6 +19,11 @@ internal sealed class ModEntry : Mod
 
     private string OhgiSecretBookId => $"{ModManifest.UniqueID}_OhgiSecretBook";
     private string InsightDropId => $"{ModManifest.UniqueID}_InsightDrop";
+    private string DragonOrbId => $"{ModManifest.UniqueID}_DragonOrb";
+
+    private string OhgiQuestId => $"{ModManifest.UniqueID}_OhgiUnlockQuest";
+    private string UltimateQuestId => $"{ModManifest.UniqueID}_UltimateUnlockQuest";
+
     private string UnlockItemTextureAsset => $"Mods/{ModManifest.UniqueID}/UnlockItems";
 
     private ModConfig Config = null!;
@@ -43,6 +50,7 @@ internal sealed class ModEntry : Mod
         helper.Events.Display.RenderedWorld += OnRenderedWorld;
         helper.Events.Input.ButtonPressed += OnButtonPressed;
         helper.Events.Content.AssetRequested += OnAssetRequested;
+        helper.Events.World.NpcListChanged += OnNpcListChanged;
 
         helper.ConsoleCommands.Add("sm_status", "Show Sword Mastery status.", CommandStatus);
         helper.ConsoleCommands.Add("sm_add", "Allocate a point. Usage: sm_add basic A | sm_add ohgi | sm_add ultimate", CommandAdd);
@@ -66,49 +74,93 @@ internal sealed class ModEntry : Mod
             return;
         }
 
-        if (!e.NameWithoutLocale.IsEquivalentTo("Data/Objects"))
-            return;
-
-        e.Edit(asset =>
+        if (e.NameWithoutLocale.IsEquivalentTo("Data/Objects"))
         {
-            var objects = asset.AsDictionary<string, ObjectData>().Data;
-
-            objects[OhgiSecretBookId] = new ObjectData
+            e.Edit(asset =>
             {
-                Name = OhgiSecretBookId,
-                DisplayName = "오의 비책",
-                Description = "오의를 해방하는 비법서. 손에 들고 행동 버튼으로 사용한다.",
-                Type = "Crafting",
-                Category = 0,
-                Price = 0,
-                Texture = UnlockItemTextureAsset,
-                SpriteIndex = 0,
-                Edibility = -300,
-                CanBeGivenAsGift = false,
-                CanBeTrashed = true,
-                ExcludeFromFishingCollection = true,
-                ExcludeFromShippingCollection = true,
-                ExcludeFromRandomSale = true
-            };
+                var objects = asset.AsDictionary<string, ObjectData>().Data;
 
-            objects[InsightDropId] = new ObjectData
+                objects[OhgiSecretBookId] = new ObjectData
+                {
+                    Name = OhgiSecretBookId,
+                    DisplayName = "오의 비책",
+                    Description = "오의를 해방하는 비법서. 손에 들고 행동 버튼으로 사용한다.",
+                    Type = "Crafting",
+                    Category = 0,
+                    Price = 0,
+                    Texture = UnlockItemTextureAsset,
+                    SpriteIndex = 0,
+                    Edibility = -300,
+                    CanBeGivenAsGift = false,
+                    CanBeTrashed = true,
+                    ExcludeFromFishingCollection = true,
+                    ExcludeFromShippingCollection = true,
+                    ExcludeFromRandomSale = true
+                };
+
+                objects[InsightDropId] = new ObjectData
+                {
+                    Name = InsightDropId,
+                    DisplayName = "깨달음의 물방울",
+                    Description = "극의를 해방하는 응축된 깨달음. 손에 들고 행동 버튼으로 사용한다.",
+                    Type = "Crafting",
+                    Category = 0,
+                    Price = 0,
+                    Texture = UnlockItemTextureAsset,
+                    SpriteIndex = 1,
+                    Edibility = -300,
+                    CanBeGivenAsGift = false,
+                    CanBeTrashed = true,
+                    ExcludeFromFishingCollection = true,
+                    ExcludeFromShippingCollection = true,
+                    ExcludeFromRandomSale = true
+                };
+
+                // New quest material. Reuse a vanilla purple gem sprite so this
+                // remains a new custom item without adding another texture dependency.
+                objects[DragonOrbId] = new ObjectData
+                {
+                    Name = DragonOrbId,
+                    DisplayName = "용의 보주",
+                    Description = "용의 기운이 응축된 보주. 손에 쥐면 안쪽에서 강한 맥동이 느껴진다.",
+                    Type = "Crafting",
+                    Category = 0,
+                    Price = 0,
+                    Texture = UnlockItemTextureAsset,
+                    SpriteIndex = 2,
+                    Edibility = -300,
+                    CanBeGivenAsGift = false,
+                    CanBeTrashed = true,
+                    ExcludeFromFishingCollection = true,
+                    ExcludeFromShippingCollection = true,
+                    ExcludeFromRandomSale = true
+                };
+            });
+
+            return;
+        }
+
+        if (e.NameWithoutLocale.IsEquivalentTo("Data/Quests"))
+        {
+            e.Edit(asset =>
             {
-                Name = InsightDropId,
-                DisplayName = "깨달음의 물방울",
-                Description = "극의를 해방하는 응축된 깨달음. 손에 들고 행동 버튼으로 사용한다.",
-                Type = "Crafting",
-                Category = 0,
-                Price = 0,
-                Texture = UnlockItemTextureAsset,
-                SpriteIndex = 1,
-                Edibility = -300,
-                CanBeGivenAsGift = false,
-                CanBeTrashed = true,
-                ExcludeFromFishingCollection = true,
-                ExcludeFromShippingCollection = true,
-                ExcludeFromRandomSale = true
-            };
-        });
+                var quests = asset.AsDictionary<string, string>().Data;
+
+                // Basic quests are completed manually by this mod so we can track
+                // multiple custom objectives while still displaying them in the vanilla journal.
+                quests[OhgiQuestId] =
+                    "Basic/[오의]새로운 경지를 깨우칠 것 같다."
+                    + "/새로운 경지가 손에 잡힐 듯하다. 실전 속에서 감각을 완성해 보자."
+                    + "/어둠의 해골 30마리 사냥"
+                    + "//-1/0/-1/false/";
+
+                quests[UltimateQuestId] =
+                    "Basic/[극의]검술의 극에 달할 수 있을 것 같다."
+                    + "/검술의 극에 닿기 위해서는 용을 넘어 그 힘까지 받아들여야 한다."
+                    + "/용 50마리 사냥, 용의 보주 10개 수집"
+                    + "//-1/0/-1/false/";
+            });
+        }
     }
 
     private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
@@ -290,7 +342,7 @@ internal sealed class ModEntry : Mod
         gmcm.AddPage(
             mod: ModManifest,
             pageId: "debug",
-            pageTitle: () => "Sword Mastery DEBUG"
+            pageTitle: () => "검술 마스터리 DEBUG"
         );
 
         gmcm.AddParagraph(
@@ -395,6 +447,89 @@ internal sealed class ModEntry : Mod
             fieldId: "DebugGiveUnlockItems"
         );
 
+        gmcm.AddSectionTitle(
+            mod: ModManifest,
+            text: () => "퀘스트 DEBUG"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => false,
+            setValue: value =>
+            {
+                if (value)
+                    DebugStartOhgiQuest();
+            },
+            name: () => "[퀘스트] 오의 퀘스트 시작",
+            tooltip: () => "레벨 조건을 무시하고 오의 해방 퀘스트를 일지에 추가합니다.",
+            fieldId: "DebugStartOhgiQuest"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => false,
+            setValue: value =>
+            {
+                if (value)
+                    DebugCompleteOhgiQuest();
+            },
+            name: () => "[퀘스트] 오의 퀘스트 즉시 완료",
+            tooltip: () => "어둠의 해골 30마리 진행도를 채우고 오의 비책 보상을 지급합니다.",
+            fieldId: "DebugCompleteOhgiQuest"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => false,
+            setValue: value =>
+            {
+                if (value)
+                    DebugStartUltimateQuest();
+            },
+            name: () => "[퀘스트] 극의 퀘스트 시작",
+            tooltip: () => "레벨 조건을 무시하고 극의 해방 퀘스트를 일지에 추가합니다.",
+            fieldId: "DebugStartUltimateQuest"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => false,
+            setValue: value =>
+            {
+                if (value)
+                    DebugSetUltimateKills();
+            },
+            name: () => "[퀘스트] 용 50마리 처리",
+            tooltip: () => "극의 퀘스트의 용 사냥 진행도를 50/50으로 만듭니다.",
+            fieldId: "DebugSetUltimateKills"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => false,
+            setValue: value =>
+            {
+                if (value)
+                    DebugGiveDragonOrbs(10);
+            },
+            name: () => "[받기] 용의 보주 10개",
+            tooltip: () => "극의 퀘스트 테스트용 용의 보주를 10개 지급합니다.",
+            fieldId: "DebugGiveDragonOrbs"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => false,
+            setValue: value =>
+            {
+                if (value)
+                    DebugCompleteUltimateQuest();
+            },
+            name: () => "[퀘스트] 극의 퀘스트 즉시 완료",
+            tooltip: () => "용 사냥과 용의 보주 조건을 모두 채운 뒤 완료 연출과 보상을 테스트합니다.",
+            fieldId: "DebugCompleteUltimateQuest"
+        );
+
         Monitor.Log("Generic Mod Config Menu integration registered.", LogLevel.Info);
     }
 
@@ -472,6 +607,791 @@ internal sealed class ModEntry : Mod
                 "인벤토리 공간이 부족합니다. 일부 아이템은 지급되지 않았습니다."
             ));
             Game1.playSound("cancel");
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Unlock quests
+    // ---------------------------------------------------------------------
+
+    private void DebugStartOhgiQuest()
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        Data.SwordLevel = Math.Max(Data.SwordLevel, 30);
+        Data.OhgiAccessGranted = false;
+        Data.SelectedOhgi = null;
+        Data.OhgiQuestStarted = false;
+        Data.OhgiQuestCompleted = false;
+        Data.OhgiSkullKills = 0;
+        Data.OhgiQuestAvailable = true;
+
+        RemoveQuestFromJournal(OhgiQuestId);
+        StartOhgiUnlockQuest();
+
+        Game1.addHUDMessage(new HUDMessage(
+            "DEBUG: 오의 해방 퀘스트를 시작했습니다.",
+            HUDMessage.newQuest_type
+        ));
+    }
+
+    private void DebugCompleteOhgiQuest()
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        if (!Data.OhgiQuestStarted || Data.OhgiQuestCompleted)
+            DebugStartOhgiQuest();
+
+        Data.OhgiSkullKills = 30;
+        UpdateOhgiQuestObjective();
+        CompleteOhgiUnlockQuest();
+    }
+
+    private void DebugStartUltimateQuest()
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        Data.SwordLevel = Math.Max(Data.SwordLevel, 50);
+        Data.UltimateAccessGranted = false;
+        Data.SelectedUltimate = null;
+        Data.UltimateQuestStarted = false;
+        Data.UltimateQuestCompleted = false;
+        Data.UltimateDragonKills = 0;
+        Data.UltimateQuestAvailable = true;
+
+        RemoveQuestFromJournal(UltimateQuestId);
+        StartUltimateUnlockQuest();
+
+        Game1.addHUDMessage(new HUDMessage(
+            "DEBUG: 극의 해방 퀘스트를 시작했습니다.",
+            HUDMessage.newQuest_type
+        ));
+    }
+
+    private void DebugSetUltimateKills()
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        if (!Data.UltimateQuestStarted || Data.UltimateQuestCompleted)
+            DebugStartUltimateQuest();
+
+        Data.UltimateDragonKills = 50;
+        UpdateUltimateQuestObjective();
+
+        Game1.addHUDMessage(new HUDMessage(
+            "DEBUG: 용 사냥 진행도를 50/50으로 설정했습니다."
+        ));
+
+        CheckUltimateQuestCompletion();
+    }
+
+    private void DebugGiveDragonOrbs(int count)
+    {
+        if (!Context.IsWorldReady || count <= 0)
+            return;
+
+        GiveItemOrDrop($"(O){DragonOrbId}", count);
+
+        Game1.addHUDMessage(new HUDMessage(
+            $"DEBUG: 용의 보주 {count}개를 지급했습니다.",
+            HUDMessage.newQuest_type
+        ));
+
+        UpdateUltimateQuestObjective();
+        CheckUltimateQuestCompletion();
+    }
+
+    private void DebugCompleteUltimateQuest()
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        if (!Data.UltimateQuestStarted || Data.UltimateQuestCompleted)
+            DebugStartUltimateQuest();
+
+        Data.UltimateDragonKills = 50;
+
+        int have = CountInventoryItem($"(O){DragonOrbId}");
+        if (have < 10)
+            GiveItemOrDrop($"(O){DragonOrbId}", 10 - have);
+
+        UpdateUltimateQuestObjective();
+
+        // DEBUG completion is allowed even if the inventory was full and some
+        // test orbs had to drop on the ground.
+        CompleteUltimateUnlockQuest(force: true);
+    }
+
+    private void EnsureUnlockQuestJournals()
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        if (Data.OhgiQuestAvailable && !Data.OhgiQuestCompleted)
+        {
+            if (!Data.OhgiQuestStarted)
+                StartOhgiUnlockQuest();
+            else
+            {
+                EnsureQuestInJournal(OhgiQuestId);
+                UpdateOhgiQuestObjective();
+            }
+        }
+
+        if (Data.UltimateQuestAvailable && !Data.UltimateQuestCompleted)
+        {
+            if (!Data.UltimateQuestStarted)
+                StartUltimateUnlockQuest();
+            else
+            {
+                EnsureQuestInJournal(UltimateQuestId);
+                UpdateUltimateQuestObjective();
+            }
+        }
+    }
+
+    private void StartOhgiUnlockQuest()
+    {
+        if (Data.OhgiQuestCompleted)
+            return;
+
+        Data.OhgiQuestStarted = true;
+        Data.OhgiQuestAvailable = true;
+        Data.OhgiSkullKills = Math.Clamp(Data.OhgiSkullKills, 0, 30);
+        EnsureQuestInJournal(OhgiQuestId);
+        UpdateOhgiQuestObjective();
+    }
+
+    private void StartUltimateUnlockQuest()
+    {
+        if (Data.UltimateQuestCompleted)
+            return;
+
+        Data.UltimateQuestStarted = true;
+        Data.UltimateQuestAvailable = true;
+        Data.UltimateDragonKills = Math.Clamp(Data.UltimateDragonKills, 0, 50);
+        EnsureQuestInJournal(UltimateQuestId);
+        UpdateUltimateQuestObjective();
+    }
+
+    private void UpdateUnlockQuestProgress()
+    {
+        // Kill progress is updated immediately through World.NpcListChanged so it
+        // works for Haunted Skulls and both Serpent variants without relying on
+        // the game's monster-slayer stat buckets. This periodic pass keeps the
+        // journal's item objective synchronized when Dragon Orbs are picked up,
+        // moved, or consumed.
+        if (Data.OhgiQuestStarted && !Data.OhgiQuestCompleted)
+            UpdateOhgiQuestObjective();
+
+        if (Data.UltimateQuestStarted && !Data.UltimateQuestCompleted)
+        {
+            UpdateUltimateQuestObjective();
+            CheckUltimateQuestCompletion();
+        }
+    }
+
+    private void OnNpcListChanged(object? sender, NpcListChangedEventArgs e)
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        foreach (NPC npc in e.Removed)
+        {
+            if (npc is not Monster monster || monster.Health > 0)
+                continue;
+
+            string monsterName = monster.Name ?? string.Empty;
+
+            if (Data.OhgiQuestStarted
+                && !Data.OhgiQuestCompleted
+                && IsHauntedSkull(monster))
+            {
+                Data.OhgiSkullKills = Math.Min(30, Data.OhgiSkullKills + 1);
+                UpdateOhgiQuestObjective();
+
+                if (Data.OhgiSkullKills >= 30)
+                    CompleteOhgiUnlockQuest();
+            }
+
+            if (Data.UltimateQuestStarted
+                && !Data.UltimateQuestCompleted
+                && (string.Equals(monsterName, "Serpent", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(monsterName, "Royal Serpent", StringComparison.OrdinalIgnoreCase)))
+            {
+                Data.UltimateDragonKills = Math.Min(50, Data.UltimateDragonKills + 1);
+
+                TryDropDragonOrb(
+                    e.Location,
+                    monster.Position + new Vector2(32f, 32f)
+                );
+
+                UpdateUltimateQuestObjective();
+                CheckUltimateQuestCompletion();
+            }
+        }
+    }
+
+    private static bool IsHauntedSkull(Monster monster)
+    {
+        // Haunted Skull is implemented by Stardew as a Bat variant, so its
+        // Monster.Name is "Bat" rather than a unique "Haunted Skull" ID.
+        if (!string.Equals(monster.Name, "Bat", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        Type type = monster.GetType();
+
+        // 1.6 exposes the Bat hauntedSkull flag in current game builds, but use
+        // reflection here to remain tolerant of field/property shape changes.
+        string[] boolMemberNames =
+        {
+            "hauntedSkull",
+            "HauntedSkull",
+            "isHauntedSkull",
+            "IsHauntedSkull"
+        };
+
+        foreach (string memberName in boolMemberNames)
+        {
+            object? raw = type.GetField(memberName, flags)?.GetValue(monster)
+                ?? type.GetProperty(memberName, flags)?.GetValue(monster);
+
+            if (TryReadBoolLikeValue(raw, out bool value) && value)
+                return true;
+        }
+
+        // Fallback: identify the dedicated Haunted Skull texture if the flag is
+        // unavailable in a future build.
+        object? sprite = monster.Sprite;
+        if (sprite is not null)
+        {
+            Type spriteType = sprite.GetType();
+            string[] textureMemberNames =
+            {
+                "TextureName",
+                "textureName",
+                "textureNameValue"
+            };
+
+            foreach (string memberName in textureMemberNames)
+            {
+                object? raw = spriteType.GetField(memberName, flags)?.GetValue(sprite)
+                    ?? spriteType.GetProperty(memberName, flags)?.GetValue(sprite);
+
+                string? textureName = ReadStringLikeValue(raw);
+                if (!string.IsNullOrWhiteSpace(textureName)
+                    && (textureName.Contains("Haunted Skull", StringComparison.OrdinalIgnoreCase)
+                        || textureName.Contains("HauntedSkull", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryReadBoolLikeValue(object? raw, out bool value)
+    {
+        if (raw is bool direct)
+        {
+            value = direct;
+            return true;
+        }
+
+        if (raw is not null)
+        {
+            PropertyInfo? valueProperty = raw.GetType().GetProperty(
+                "Value",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
+
+            object? nested = valueProperty?.GetValue(raw);
+            if (nested is bool nestedBool)
+            {
+                value = nestedBool;
+                return true;
+            }
+
+            if (bool.TryParse(nested?.ToString() ?? raw.ToString(), out bool parsed))
+            {
+                value = parsed;
+                return true;
+            }
+        }
+
+        value = false;
+        return false;
+    }
+
+    private void CheckUltimateQuestCompletion()
+    {
+        if (!Data.UltimateQuestStarted || Data.UltimateQuestCompleted)
+            return;
+
+        if (Data.UltimateDragonKills < 50)
+            return;
+
+        if (CountInventoryItem($"(O){DragonOrbId}") < 10)
+            return;
+
+        CompleteUltimateUnlockQuest(force: false);
+    }
+
+    private void CompleteOhgiUnlockQuest()
+    {
+        if (Data.OhgiQuestCompleted)
+            return;
+
+        Data.OhgiSkullKills = 30;
+        Data.OhgiQuestCompleted = true;
+        Data.OhgiQuestAvailable = false;
+
+        CompleteQuestInJournal(OhgiQuestId);
+
+        GiveItemOrDrop($"(O){OhgiSecretBookId}", 1);
+
+        Game1.addHUDMessage(new HUDMessage(
+            "오의 해방 퀘스트 완료! 오의 비책을 얻었습니다.",
+            HUDMessage.newQuest_type
+        ));
+        Game1.playSound("questcomplete");
+    }
+
+    private void CompleteUltimateUnlockQuest(bool force)
+    {
+        if (Data.UltimateQuestCompleted)
+            return;
+
+        if (!force)
+        {
+            if (Data.UltimateDragonKills < 50)
+                return;
+
+            if (CountInventoryItem($"(O){DragonOrbId}") < 10)
+                return;
+        }
+
+        // The 10 orbs are consumed as their power is absorbed into the player.
+        RemoveInventoryItem($"(O){DragonOrbId}", 10);
+
+        Data.UltimateDragonKills = 50;
+        Data.UltimateQuestCompleted = true;
+        Data.UltimateQuestAvailable = false;
+
+        CompleteQuestInJournal(UltimateQuestId);
+        PlayDragonOrbAbsorptionEffect();
+
+        GiveItemOrDrop($"(O){InsightDropId}", 1);
+
+        Game1.addHUDMessage(new HUDMessage(
+            "용의 보주의 힘이 몸에 스며들었다. 깨달음의 물방울을 얻었습니다.",
+            HUDMessage.newQuest_type
+        ));
+    }
+
+    private void TryDropDragonOrb(GameLocation location, Vector2 position)
+    {
+        // Base 12%. Positive daily luck contributes up to 2%, and Luck Level
+        // contributes up to 1%. The final chance is hard-capped at 15%.
+        double dailyLuckBonus =
+            Math.Clamp(Math.Max(0d, Game1.player.DailyLuck) * 0.20d, 0d, 0.02d);
+
+        double luckLevelBonus =
+            Math.Clamp(Math.Max(0, Game1.player.LuckLevel) * 0.001d, 0d, 0.01d);
+
+        double chance =
+            Math.Min(0.15d, 0.12d + dailyLuckBonus + luckLevelBonus);
+
+        if (Game1.random.NextDouble() >= chance)
+            return;
+
+        Item orb = ItemRegistry.Create($"(O){DragonOrbId}");
+
+        Game1.createItemDebris(
+            orb,
+            position,
+            -1,
+            location
+        );
+
+        Game1.addHUDMessage(new HUDMessage(
+            "용의 보주가 떨어졌습니다.",
+            HUDMessage.newQuest_type
+        ));
+        Game1.playSound("discoverMineral");
+    }
+
+    private void UpdateOhgiQuestObjective()
+    {
+        if (!Data.OhgiQuestStarted || Data.OhgiQuestCompleted)
+            return;
+
+        SetQuestObjective(
+            OhgiQuestId,
+            $"어둠의 해골 사냥 ({Math.Min(30, Data.OhgiSkullKills)}/30)"
+        );
+    }
+
+    private void UpdateUltimateQuestObjective()
+    {
+        if (!Data.UltimateQuestStarted || Data.UltimateQuestCompleted)
+            return;
+
+        int orbs = Math.Min(
+            10,
+            CountInventoryItem($"(O){DragonOrbId}")
+        );
+
+        SetQuestObjective(
+            UltimateQuestId,
+            $"용 사냥 ({Math.Min(50, Data.UltimateDragonKills)}/50)\n"
+            + $"용의 보주 ({orbs}/10)"
+        );
+    }
+
+    private void EnsureQuestInJournal(string questId)
+    {
+        if (FindQuestInJournal(questId) is not null)
+            return;
+
+        MethodInfo? addQuest = Game1.player.GetType().GetMethod(
+            "addQuest",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            types: new[] { typeof(string) },
+            modifiers: null
+        );
+
+        if (addQuest is null)
+        {
+            Monitor.Log(
+                $"Could not add custom quest '{questId}': Farmer.addQuest(string) was not found.",
+                LogLevel.Error
+            );
+            return;
+        }
+
+        try
+        {
+            addQuest.Invoke(Game1.player, new object[] { questId });
+        }
+        catch (Exception ex)
+        {
+            Monitor.Log(
+                $"Could not add custom quest '{questId}': {ex}",
+                LogLevel.Error
+            );
+        }
+    }
+
+    private void CompleteQuestInJournal(string questId)
+    {
+        MethodInfo? completeQuest = Game1.player.GetType().GetMethod(
+            "completeQuest",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            types: new[] { typeof(string) },
+            modifiers: null
+        );
+
+        if (completeQuest is not null)
+        {
+            try
+            {
+                completeQuest.Invoke(Game1.player, new object[] { questId });
+                return;
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log(
+                    $"Could not complete quest '{questId}' through Farmer.completeQuest: {ex.Message}",
+                    LogLevel.Trace
+                );
+            }
+        }
+
+        // Fallback for game builds where completion is handled differently:
+        // remove it from the journal; SaveData remains the authoritative completion flag.
+        RemoveQuestFromJournal(questId);
+    }
+
+    private void RemoveQuestFromJournal(string questId)
+    {
+        MethodInfo? removeQuest = Game1.player.GetType().GetMethod(
+            "removeQuest",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            types: new[] { typeof(string) },
+            modifiers: null
+        );
+
+        if (removeQuest is null)
+            return;
+
+        try
+        {
+            removeQuest.Invoke(Game1.player, new object[] { questId });
+        }
+        catch
+        {
+            // DEBUG/reset helper only; safe to ignore if the quest wasn't present.
+        }
+    }
+
+    private object? FindQuestInJournal(string questId)
+    {
+        foreach (object quest in Game1.player.questLog)
+        {
+            if (string.Equals(
+                GetQuestIdByReflection(quest),
+                questId,
+                StringComparison.Ordinal
+            ))
+            {
+                return quest;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GetQuestIdByReflection(object quest)
+    {
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        FieldInfo? field = quest.GetType().GetField("id", flags);
+        if (field is not null)
+            return ReadStringLikeValue(field.GetValue(quest));
+
+        PropertyInfo? property = quest.GetType().GetProperty("id", flags);
+        if (property is not null)
+            return ReadStringLikeValue(property.GetValue(quest));
+
+        PropertyInfo? idProperty = quest.GetType().GetProperty("Id", flags);
+        return idProperty is null
+            ? null
+            : ReadStringLikeValue(idProperty.GetValue(quest));
+    }
+
+    private void SetQuestObjective(string questId, string objective)
+    {
+        object? quest = FindQuestInJournal(questId);
+        if (quest is null)
+            return;
+
+        if (!TrySetStringLikeMember(
+                quest,
+                "currentObjective",
+                objective
+            )
+            && !TrySetStringLikeMember(
+                quest,
+                "_currentObjective",
+                objective
+            ))
+        {
+            Monitor.Log(
+                $"Could not update journal objective for '{questId}'.",
+                LogLevel.Trace
+            );
+        }
+    }
+
+    private static string? ReadStringLikeValue(object? value)
+    {
+        if (value is null)
+            return null;
+
+        if (value is string text)
+            return text;
+
+        PropertyInfo? property = value.GetType().GetProperty(
+            "Value",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+
+        return property?.GetValue(value)?.ToString();
+    }
+
+    private static bool TrySetStringLikeMember(
+        object target,
+        string memberName,
+        string value
+    )
+    {
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        FieldInfo? field = target.GetType().GetField(memberName, flags);
+
+        if (field is not null)
+        {
+            if (field.FieldType == typeof(string))
+            {
+                field.SetValue(target, value);
+                return true;
+            }
+
+            object? raw = field.GetValue(target);
+            if (TrySetNetValue(raw, value))
+                return true;
+        }
+
+        PropertyInfo? property =
+            target.GetType().GetProperty(memberName, flags)
+            ?? target.GetType().GetProperty(
+                char.ToUpperInvariant(memberName[0]) + memberName[1..],
+                flags
+            );
+
+        if (property is not null)
+        {
+            if (property.PropertyType == typeof(string) && property.CanWrite)
+            {
+                property.SetValue(target, value);
+                return true;
+            }
+
+            object? raw = property.GetValue(target);
+            if (TrySetNetValue(raw, value))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TrySetNetValue(object? target, string value)
+    {
+        if (target is null)
+            return false;
+
+        PropertyInfo? valueProperty = target.GetType().GetProperty(
+            "Value",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+
+        if (valueProperty is null
+            || !valueProperty.CanWrite
+            || valueProperty.PropertyType != typeof(string))
+        {
+            return false;
+        }
+
+        valueProperty.SetValue(target, value);
+        return true;
+    }
+
+    private static int CountInventoryItem(string qualifiedItemId)
+    {
+        int total = 0;
+
+        foreach (Item? item in Game1.player.Items)
+        {
+            if (item?.QualifiedItemId == qualifiedItemId)
+                total += item.Stack;
+        }
+
+        return total;
+    }
+
+    private static int RemoveInventoryItem(
+        string qualifiedItemId,
+        int amount
+    )
+    {
+        int remaining = Math.Max(0, amount);
+
+        for (int i = 0; i < Game1.player.Items.Count && remaining > 0; i++)
+        {
+            Item? item = Game1.player.Items[i];
+
+            if (item?.QualifiedItemId != qualifiedItemId)
+                continue;
+
+            int take = Math.Min(item.Stack, remaining);
+            item.Stack -= take;
+            remaining -= take;
+
+            if (item.Stack <= 0)
+                Game1.player.Items[i] = null;
+        }
+
+        return amount - remaining;
+    }
+
+    private static void GiveItemOrDrop(
+        string qualifiedItemId,
+        int stack
+    )
+    {
+        Item item = ItemRegistry.Create(
+            qualifiedItemId,
+            Math.Max(1, stack)
+        );
+
+        if (!Game1.player.addItemToInventoryBool(item))
+        {
+            Game1.createItemDebris(
+                item,
+                Game1.player.getStandingPosition(),
+                -1,
+                Game1.currentLocation
+            );
+        }
+    }
+
+    private void PlayDragonOrbAbsorptionEffect()
+    {
+        Vector2 center = Game1.player.getStandingPosition();
+        Color glow = new(128, 76, 255);
+
+        Game1.screenGlowOnce(glow, hold: false);
+        Game1.playSound("stardrop");
+
+        // Purple-blue particles converge from a ring into the player.
+        for (int i = 0; i < 18; i++)
+        {
+            float angle = MathF.PI * 2f * i / 18f;
+            float radius = 120f + (i % 4) * 20f;
+
+            Vector2 start = center + new Vector2(
+                MathF.Cos(angle),
+                MathF.Sin(angle)
+            ) * radius;
+
+            Vector2 motion = (center - start) / 26f;
+
+            TemporaryAnimatedSprite particle = new(
+                10,
+                start,
+                i % 2 == 0
+                    ? new Color(148, 88, 255)
+                    : new Color(88, 178, 255)
+            )
+            {
+                motion = motion,
+                scale = 0.7f + (i % 3) * 0.12f,
+                alphaFade = 0.018f,
+                delayBeforeAnimationStart = i * 28,
+                layerDepth = 1f
+            };
+
+            Game1.currentLocation.temporarySprites.Add(particle);
         }
     }
 
@@ -644,7 +1564,9 @@ internal sealed class ModEntry : Mod
             Data.KillCounterInitialized = true;
         }
 
-        Skills.UpdateUnlockState(Data);
+        // Also restores/adds quest journal entries for existing saves already past
+        // the level 30 / 50 thresholds.
+        RefreshUnlockState(showMessages: false);
     }
 
     private void OnSaving(object? sender, SavingEventArgs e)
@@ -673,6 +1595,9 @@ internal sealed class ModEntry : Mod
 
         if (!e.IsMultipleOf(15))
             return;
+
+        // Quest progress is sampled at the same 15-tick cadence as mastery XP.
+        UpdateUnlockQuestProgress();
 
         int currentKills = Convert.ToInt32(Game1.player.stats.MonstersKilled);
         int gainedKills = currentKills - Data.LastObservedMonsterKills;
@@ -706,6 +1631,7 @@ internal sealed class ModEntry : Mod
         bool prevUltimateAccess = Data.UltimateAccessGranted;
 
         Skills.UpdateUnlockState(Data);
+        EnsureUnlockQuestJournals();
 
         if (showMessages)
             NotifyUnlockChanges(prevOhgiQuest, prevUltimateQuest, prevOhgiAccess, prevUltimateAccess);

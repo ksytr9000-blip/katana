@@ -242,27 +242,58 @@ internal sealed class CombatService
             float alpha = Math.Clamp(fx.Ticks / (float)fx.MaxTicks, 0f, 1f);
             Vector2 center = WorldToScreen(fx.Center);
 
-            DrawCrescent(
-                b,
-                center,
-                fx.Radius,
-                fx.CenterAngle,
-                fx.Sweep,
-                fx.Width,
-                new Color(55, 185, 255) * alpha,
-                segments: 16
-            );
+            if (fx.Asymmetric)
+            {
+                DrawAsymmetricCrescent(
+                    b,
+                    center,
+                    fx.Radius,
+                    fx.CenterAngle,
+                    fx.Sweep,
+                    fx.Width,
+                    new Color(45, 170, 255) * alpha,
+                    segments: 20,
+                    curveBias: fx.CurveBias,
+                    bendStrength: fx.BendStrength
+                );
 
-            DrawCrescent(
-                b,
-                center,
-                fx.Radius - Math.Max(2f, fx.Width * 0.22f),
-                fx.CenterAngle,
-                fx.Sweep,
-                Math.Max(2f, fx.Width * 0.34f),
-                Color.White * Math.Min(1f, alpha + 0.15f),
-                segments: 16
-            );
+                DrawAsymmetricCrescent(
+                    b,
+                    center,
+                    fx.Radius - Math.Max(2f, fx.Width * 0.18f),
+                    fx.CenterAngle,
+                    fx.Sweep,
+                    Math.Max(2.4f, fx.Width * 0.30f),
+                    Color.White * Math.Min(1f, alpha + 0.18f),
+                    segments: 20,
+                    curveBias: fx.CurveBias,
+                    bendStrength: fx.BendStrength
+                );
+            }
+            else
+            {
+                DrawCrescent(
+                    b,
+                    center,
+                    fx.Radius,
+                    fx.CenterAngle,
+                    fx.Sweep,
+                    fx.Width,
+                    new Color(55, 185, 255) * alpha,
+                    segments: 16
+                );
+
+                DrawCrescent(
+                    b,
+                    center,
+                    fx.Radius - Math.Max(2f, fx.Width * 0.22f),
+                    fx.CenterAngle,
+                    fx.Sweep,
+                    Math.Max(2f, fx.Width * 0.34f),
+                    Color.White * Math.Min(1f, alpha + 0.15f),
+                    segments: 16
+                );
+            }
         }
 
         foreach (LineFx fx in LineEffects)
@@ -816,6 +847,7 @@ internal sealed class CombatService
         int damage = ScaleDamage(weaponDamage, damageMultiplier);
 
         int fxIndex = 0;
+        bool hitAnything = false;
 
         foreach (NPC npc in Game1.currentLocation.characters.ToList())
         {
@@ -828,14 +860,19 @@ internal sealed class CombatService
             if (Vector2.Distance(playerCenter, monsterCenter) > radiusPixels)
                 continue;
 
-            // Damage is applied directly to the monster with LOS ignored,
-            // so rocks / ore between the farmer and monster do not block the passive.
-            DamageSingleMonsterIgnoringTerrain(
+            // 검술의 극은 항상 치명타.
+            // LOS도 무시해서 돌/광석 뒤의 적까지 그대로 베어낸다.
+            if (DamageSingleMonsterIgnoringTerrain(
                 Game1.currentLocation,
                 monster,
                 damage,
-                knockback: 0f
-            );
+                knockback: 0f,
+                guaranteedCritical: true,
+                critMultiplier: 2f
+            ))
+            {
+                hitAnything = true;
+            }
 
             AddArcFx(
                 monsterCenter,
@@ -848,6 +885,9 @@ internal sealed class CombatService
 
             fxIndex++;
         }
+
+        if (hitAnything)
+            Game1.playSound("crit");
 
         // Passive, but not every frame. Higher stages feel more "mastered" by ticking a little faster.
         UltimateAuraTick = stage switch
@@ -1655,7 +1695,8 @@ internal sealed class CombatService
         Monster monster,
         int damage,
         float knockback,
-        bool guaranteedCritical = false
+        bool guaranteedCritical = false,
+        float critMultiplier = 1f
     )
     {
         if (monster.Health <= 0)
@@ -1679,7 +1720,7 @@ internal sealed class CombatService
                 knockBackModifier: knockback,
                 addedPrecision: 0,
                 critChance: guaranteedCritical ? 1f : 0f,
-                critMultiplier: 1f,
+                critMultiplier: critMultiplier,
                 triggerMonsterInvincibleTimer: false,
                 who: Game1.player
             );
@@ -1815,59 +1856,92 @@ internal sealed class CombatService
         if (visualStyle == 2)
         {
             // Ohgi C "검술의 정점":
-            // RPG-finisher style. Large layered blade slashes all pass through
-            // the player center, with thicker glow and overlapping angles.
-            int slashCount = 4 + (variant % 3);
-            float seed = variant * 0.71f;
+            // chaotic RPG-finisher crescents. Slashes are deliberately offset around
+            // the player instead of all converging into one point.
+            int seedValue =
+                variant * 7919
+                + (int)center.X * 31
+                + (int)center.Y * 17;
+
+            Random random = new(seedValue ^ Environment.TickCount);
+            int slashCount = 7 + (variant % 4);
 
             for (int j = 0; j < slashCount; j++)
             {
-                float angle =
-                    seed
-                    + j * (MathF.PI / slashCount)
-                    + (variant % 2 == 0 ? 0.18f : -0.18f);
-
-                Vector2 slashDirection = new(
-                    MathF.Cos(angle),
-                    MathF.Sin(angle)
-                );
-
-                float halfLength =
+                float orbitAngle = (float)(random.NextDouble() * Math.PI * 2.0);
+                float orbitRadius =
                     baseRadius
-                    * (1.04f + j * 0.08f + (variant % 3) * 0.05f);
+                    * (0.10f + (float)random.NextDouble() * 0.58f);
 
-                AddBladeSlashFx(
-                    center - slashDirection * halfLength,
-                    center + slashDirection * halfLength,
-                    maxWidth: 30f + j * 3.5f + (variant % 3) * 2.5f,
-                    ticks: 18,
-                    finisherStyle: true
+                Vector2 localCenter = center + new Vector2(
+                    MathF.Cos(orbitAngle),
+                    MathF.Sin(orbitAngle)
+                ) * orbitRadius;
+
+                float slashAngle =
+                    (float)(random.NextDouble() * Math.PI * 2.0);
+
+                float slashRadius =
+                    baseRadius
+                    * (0.42f + (float)random.NextDouble() * 0.48f);
+
+                float sweep =
+                    1.55f + (float)random.NextDouble() * 1.05f;
+
+                float width =
+                    24f
+                    + (float)random.NextDouble() * 24f
+                    + (variant % 3) * 3.0f;
+
+                float bias =
+                    -0.42f + (float)random.NextDouble() * 0.84f;
+
+                float bend =
+                    (random.Next(2) == 0 ? -1f : 1f)
+                    * (0.85f + (float)random.NextDouble() * 0.75f);
+
+                AddAsymmetricArcFx(
+                    localCenter,
+                    slashRadius,
+                    slashAngle,
+                    sweep,
+                    width,
+                    ticks: 18 + random.Next(0, 5),
+                    curveBias: bias,
+                    bendStrength: bend
                 );
             }
 
-            // Finisher pulse: two massive crossing cuts.
-            if (variant % 2 == 1)
+            // Every hit also throws one or two oversized one-sided crescents across
+            // the player area, so the whole skill reads as a finisher rather than
+            // a cluster of small sparks.
+            int finisherArcs = variant % 3 == 2 ? 2 : 1;
+
+            for (int k = 0; k < finisherArcs; k++)
             {
-                for (int j = 0; j < 2; j++)
-                {
-                    float angle =
-                        MathF.PI / 4f
-                        + j * MathF.PI / 2f
-                        + seed * 0.22f;
+                float bigAngle =
+                    (float)(random.NextDouble() * Math.PI * 2.0);
 
-                    Vector2 direction = new(
-                        MathF.Cos(angle),
-                        MathF.Sin(angle)
-                    );
+                float offsetAngle =
+                    (float)(random.NextDouble() * Math.PI * 2.0);
 
-                    AddBladeSlashFx(
-                        center - direction * (baseRadius * 1.34f),
-                        center + direction * (baseRadius * 1.34f),
-                        maxWidth: 42f,
-                        ticks: 21,
-                        finisherStyle: true
-                    );
-                }
+                Vector2 bigCenter = center + new Vector2(
+                    MathF.Cos(offsetAngle),
+                    MathF.Sin(offsetAngle)
+                ) * (baseRadius * (0.08f + (float)random.NextDouble() * 0.24f));
+
+                AddAsymmetricArcFx(
+                    bigCenter,
+                    baseRadius * (0.90f + (float)random.NextDouble() * 0.25f),
+                    bigAngle,
+                    sweep: 2.15f + (float)random.NextDouble() * 0.50f,
+                    width: 44f + (float)random.NextDouble() * 18f,
+                    ticks: 22 + random.Next(0, 6),
+                    curveBias: -0.34f + (float)random.NextDouble() * 0.68f,
+                    bendStrength:
+                        (random.Next(2) == 0 ? -1f : 1f)
+                        * (1.15f + (float)random.NextDouble() * 0.55f)
+                );
             }
 
             return;
@@ -1982,6 +2056,32 @@ internal sealed class CombatService
         });
     }
 
+    private void AddAsymmetricArcFx(
+        Vector2 center,
+        float radius,
+        float centerAngle,
+        float sweep,
+        float width,
+        int ticks,
+        float curveBias,
+        float bendStrength
+    )
+    {
+        ArcEffects.Add(new ArcFx
+        {
+            Center = center,
+            Radius = radius,
+            CenterAngle = centerAngle,
+            Sweep = sweep,
+            Width = width,
+            Ticks = ticks,
+            MaxTicks = ticks,
+            Asymmetric = true,
+            CurveBias = curveBias,
+            BendStrength = bendStrength
+        });
+    }
+
     private static float FacingAngle(int facingDirection)
     {
         return facingDirection switch
@@ -2080,6 +2180,76 @@ internal sealed class CombatService
             float middleT = (i - 0.5f) / segments;
             float taper = MathF.Sin(MathF.PI * Math.Clamp(middleT, 0f, 1f));
             float width = Math.Max(1.25f, maxWidth * MathF.Pow(taper, 0.72f));
+
+            DrawLine(
+                b,
+                previous,
+                current,
+                width,
+                color
+            );
+
+            previous = current;
+        }
+    }
+
+    private static void DrawAsymmetricCrescent(
+        SpriteBatch b,
+        Vector2 center,
+        float radius,
+        float centerAngle,
+        float sweep,
+        float maxWidth,
+        Color color,
+        int segments,
+        float curveBias,
+        float bendStrength
+    )
+    {
+        float halfSweep = sweep / 2f;
+
+        Vector2 start = center + new Vector2(
+            MathF.Cos(centerAngle - halfSweep),
+            MathF.Sin(centerAngle - halfSweep)
+        ) * radius;
+
+        Vector2 end = center + new Vector2(
+            MathF.Cos(centerAngle + halfSweep),
+            MathF.Sin(centerAngle + halfSweep)
+        ) * radius;
+
+        Vector2 chord = end - start;
+        float chordLength = chord.Length();
+
+        if (chordLength <= 0.01f)
+            return;
+
+        Vector2 chordDir = chord / chordLength;
+        Vector2 normal = new(-chordDir.Y, chordDir.X);
+        Vector2 midpoint = (start + end) * 0.5f;
+
+        // Bias shifts the belly of the crescent toward one end, while bendStrength
+        // controls which side it bows toward and how aggressively it bends.
+        Vector2 control =
+            midpoint
+            + chordDir * (curveBias * radius)
+            + normal * (radius * 0.62f * bendStrength);
+
+        Vector2 previous = start;
+
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = i / (float)segments;
+            float inv = 1f - t;
+
+            Vector2 current =
+                inv * inv * start
+                + 2f * inv * t * control
+                + t * t * end;
+
+            float middleT = (i - 0.5f) / segments;
+            float taper = MathF.Sin(MathF.PI * Math.Clamp(middleT, 0f, 1f));
+            float width = Math.Max(1.25f, maxWidth * MathF.Pow(taper, 0.58f));
 
             DrawLine(
                 b,
@@ -2263,5 +2433,9 @@ internal sealed class CombatService
         public float Width { get; set; }
         public int Ticks { get; set; }
         public int MaxTicks { get; set; }
+
+        public bool Asymmetric { get; set; }
+        public float CurveBias { get; set; }
+        public float BendStrength { get; set; } = 1f;
     }
 }
