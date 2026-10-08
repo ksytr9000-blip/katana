@@ -653,97 +653,279 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
     private void DrawTooltip(SpriteBatch b, string id)
     {
+        SkillProgress progress = Data.Skills[id];
         string title = SkillNames[id];
         string[] lines = SkillDescriptions[id];
         string state = GetStateText(id);
 
-        int tooltipWidth = 410;
-        int tooltipHeight = 132 + lines.Length * 25;
+        int tooltipWidth = Math.Min(560, Math.Max(460, width / 2 - 60));
+        int tooltipHeight = 330;
 
-        int x = HoverX + 24;
-        int y = HoverY + 22;
+        // 고정형 상세 카드:
+        // 마우스가 왼쪽에 있으면 오른쪽에, 오른쪽에 있으면 왼쪽에 표시.
+        bool showOnRight = HoverX < xPositionOnScreen + width / 2;
 
-        if (x + tooltipWidth > Game1.uiViewport.Width - 16)
-            x = HoverX - tooltipWidth - 20;
+        int x = showOnRight
+            ? xPositionOnScreen + width - tooltipWidth - 26
+            : xPositionOnScreen + 26;
 
-        if (y + tooltipHeight > Game1.uiViewport.Height - 16)
-            y = Game1.uiViewport.Height - tooltipHeight - 16;
+        int y = yPositionOnScreen + 112;
 
-        x = Math.Max(16, x);
-        y = Math.Max(16, y);
+        Rectangle card = new(x, y, tooltipWidth, tooltipHeight);
 
         IClickableMenu.drawTextureBox(
             b,
-            x,
-            y,
-            tooltipWidth,
-            tooltipHeight,
-            Color.White
+            card.X,
+            card.Y,
+            card.Width,
+            card.Height,
+            new Color(255, 246, 214)
         );
 
-        Rectangle inner = new(x + 10, y + 10, tooltipWidth - 20, tooltipHeight - 20);
-        b.Draw(Game1.staminaRect, inner, new Color(70, 40, 26) * 0.96f);
+        Rectangle inner = new(
+            card.X + 12,
+            card.Y + 12,
+            card.Width - 24,
+            card.Height - 24
+        );
 
-        Rectangle iconFrame = new(x + 18, y + 18, 68, 68);
+        b.Draw(
+            Game1.staminaRect,
+            inner,
+            new Color(250, 226, 171) * 0.88f
+        );
+
+        // 아이콘
+        Rectangle iconFrame = new(card.X + 22, card.Y + 22, 88, 88);
         IClickableMenu.drawTextureBox(
             b,
             iconFrame.X,
             iconFrame.Y,
             iconFrame.Width,
             iconFrame.Height,
-            new Color(255, 220, 145)
+            Color.White
         );
 
-        Rectangle icon = new(iconFrame.X + 6, iconFrame.Y + 6, 56, 56);
+        Rectangle icon = new(
+            iconFrame.X + 8,
+            iconFrame.Y + 8,
+            iconFrame.Width - 16,
+            iconFrame.Height - 16
+        );
+
         b.Draw(
             Icons[id],
             icon,
-            IsLocked(id, GetGroup(id)) ? Color.White * 0.35f : Color.White
+            IsLocked(id, GetGroup(id))
+                ? Color.White * 0.40f
+                : Color.White
         );
 
-        // 기술명만 표시. "기초검술 A/B/C" 같은 분류 문구는 표시하지 않음.
+        // 제목
         Utility.drawTextWithShadow(
             b,
             title,
             Game1.smallFont,
-            new Vector2(x + 104, y + 28),
-            new Color(255, 205, 92)
+            new Vector2(card.X + 132, card.Y + 30),
+            new Color(94, 50, 24)
         );
 
-        Rectangle divider = new(x + 18, y + 98, tooltipWidth - 36, 2);
-        b.Draw(Game1.staminaRect, divider, new Color(183, 123, 63) * 0.8f);
-
-        int lineY = y + 112;
-        foreach (string line in lines)
-        {
-            Utility.drawTextWithShadow(
-                b,
-                line,
-                Game1.tinyFont,
-                new Vector2(x + 22, lineY),
-                Color.White
-            );
-            lineY += 25;
-        }
-
-        Rectangle footer = new(x + 18, y + tooltipHeight - 49, tooltipWidth - 36, 2);
-        b.Draw(Game1.staminaRect, footer, new Color(183, 123, 63) * 0.65f);
+        int currentStage = GetCurrentStage(progress);
+        string stageText = currentStage <= 0
+            ? "미습득"
+            : currentStage >= 3 && progress.Stage3 >= 5
+                ? "MASTER"
+                : $"현재 {ToRoman(currentStage)}단계";
 
         Utility.drawTextWithShadow(
             b,
-            $"투자 {Data.Skills[id].TotalPoints}/15",
-            Game1.tinyFont,
-            new Vector2(x + 22, y + tooltipHeight - 37),
-            new Color(255, 205, 92)
+            stageText,
+            Game1.smallFont,
+            new Vector2(card.X + 132, card.Y + 70),
+            currentStage > 0
+                ? new Color(58, 118, 53)
+                : Color.DimGray
+        );
+
+        // 구분선
+        Rectangle headerLine = new(
+            card.X + 22,
+            card.Y + 124,
+            card.Width - 44,
+            3
+        );
+
+        b.Draw(
+            Game1.staminaRect,
+            headerLine,
+            new Color(154, 100, 52) * 0.75f
+        );
+
+        // 단계별 상세 설명
+        int rowY = card.Y + 143;
+
+        DrawTooltipStageRow(
+            b,
+            card.X + 26,
+            rowY,
+            "I",
+            progress.Stage1,
+            lines.Length > 0 ? lines[0] : "",
+            stageIndex: 1
+        );
+
+        rowY += 48;
+
+        DrawTooltipStageRow(
+            b,
+            card.X + 26,
+            rowY,
+            "II",
+            progress.Stage2,
+            lines.Length > 1 ? lines[1] : "",
+            stageIndex: 2
+        );
+
+        rowY += 48;
+
+        DrawTooltipStageRow(
+            b,
+            card.X + 26,
+            rowY,
+            "III",
+            progress.Stage3,
+            lines.Length > 2 ? lines[2] : "",
+            stageIndex: 3
+        );
+
+        // 하단 상태 영역
+        Rectangle footerLine = new(
+            card.X + 22,
+            card.Bottom - 66,
+            card.Width - 44,
+            3
+        );
+
+        b.Draw(
+            Game1.staminaRect,
+            footerLine,
+            new Color(154, 100, 52) * 0.60f
+        );
+
+        Utility.drawTextWithShadow(
+            b,
+            $"총 투자 {progress.TotalPoints}/15",
+            Game1.smallFont,
+            new Vector2(card.X + 28, card.Bottom - 52),
+            new Color(96, 58, 28)
         );
 
         Utility.drawTextWithShadow(
             b,
             state,
-            Game1.tinyFont,
-            new Vector2(x + 150, y + tooltipHeight - 37),
-            GetStateColor(id)
+            Game1.smallFont,
+            new Vector2(card.X + 210, card.Bottom - 52),
+            GetReadableStateColor(id)
         );
+    }
+
+    private void DrawTooltipStageRow(
+        SpriteBatch b,
+        int x,
+        int y,
+        string roman,
+        int invested,
+        string description,
+        int stageIndex
+    )
+    {
+        Rectangle row = new(
+            x,
+            y,
+            500,
+            40
+        );
+
+        Color rowColor;
+
+        if (invested >= 5)
+            rowColor = new Color(210, 226, 182);
+        else if (invested > 0)
+            rowColor = new Color(244, 216, 150);
+        else
+            rowColor = new Color(222, 209, 180);
+
+        b.Draw(
+            Game1.staminaRect,
+            new Rectangle(row.X, row.Y, Math.Min(row.Width, width / 2 - 84), row.Height),
+            rowColor * 0.72f
+        );
+
+        Utility.drawTextWithShadow(
+            b,
+            roman,
+            Game1.smallFont,
+            new Vector2(row.X + 10, row.Y + 8),
+            invested > 0
+                ? new Color(106, 63, 28)
+                : Color.DimGray
+        );
+
+        Utility.drawTextWithShadow(
+            b,
+            $"{invested}/5",
+            Game1.smallFont,
+            new Vector2(row.X + 54, row.Y + 8),
+            invested >= 5
+                ? new Color(45, 110, 46)
+                : new Color(109, 77, 48)
+        );
+
+        Utility.drawTextWithShadow(
+            b,
+            description,
+            Game1.smallFont,
+            new Vector2(row.X + 116, row.Y + 8),
+            Game1.textColor
+        );
+    }
+
+    private static int GetCurrentStage(SkillProgress progress)
+    {
+        if (progress.Stage3 > 0)
+            return 3;
+
+        if (progress.Stage2 > 0)
+            return 2;
+
+        if (progress.Stage1 > 0)
+            return 1;
+
+        return 0;
+    }
+
+    private static string ToRoman(int stage)
+    {
+        return stage switch
+        {
+            1 => "I",
+            2 => "II",
+            3 => "III",
+            _ => "-"
+        };
+    }
+
+    private Color GetReadableStateColor(string id)
+    {
+        string state = GetStateText(id);
+
+        if (state.StartsWith("잠김") || state.StartsWith("선택 불가"))
+            return new Color(115, 92, 75);
+
+        if (state.Contains("선택됨") || state.Contains("MASTER"))
+            return new Color(49, 112, 52);
+
+        return new Color(57, 72, 125);
     }
 
     private string GetGroup(string id)
@@ -774,7 +956,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             if (Data.SelectedOhgi is null)
             {
                 if (!Data.Skills[$"Basic{branch}"].IsMastered)
-                    return $"잠김: 기본 스킬 {branch} MASTER 필요";
+                    return $"잠김: 기초검술 {branch} MASTER 필요";
 
                 return "클릭: 이 오의를 선택";
             }
@@ -797,16 +979,4 @@ internal sealed class SkillTreeMenu : IClickableMenu
         return "선택 불가: 다른 극의가 확정됨";
     }
 
-    private Color GetStateColor(string id)
-    {
-        string state = GetStateText(id);
-
-        if (state.StartsWith("잠김") || state.StartsWith("선택 불가"))
-            return Color.Gray;
-
-        if (state.Contains("선택됨") || state.Contains("MASTER"))
-            return Color.DarkGreen;
-
-        return Color.DarkSlateBlue;
-    }
 }
