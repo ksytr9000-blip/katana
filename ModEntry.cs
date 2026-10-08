@@ -630,9 +630,13 @@ internal sealed class ModEntry : Mod
         RemoveQuestFromJournal(OhgiQuestId);
         StartOhgiUnlockQuest();
 
+        bool inserted = FindQuestInJournal(OhgiQuestId) is not null;
+
         Game1.addHUDMessage(new HUDMessage(
-            "DEBUG: 오의 해방 퀘스트를 시작했습니다.",
-            HUDMessage.newQuest_type
+            inserted
+                ? "DEBUG: 오의 해방 퀘스트를 일지에 추가했습니다."
+                : "DEBUG 오류: 오의 퀘스트가 일지에 추가되지 않았습니다. SMAPI 로그를 확인하세요.",
+            inserted ? HUDMessage.newQuest_type : HUDMessage.error_type
         ));
     }
 
@@ -665,9 +669,13 @@ internal sealed class ModEntry : Mod
         RemoveQuestFromJournal(UltimateQuestId);
         StartUltimateUnlockQuest();
 
+        bool inserted = FindQuestInJournal(UltimateQuestId) is not null;
+
         Game1.addHUDMessage(new HUDMessage(
-            "DEBUG: 극의 해방 퀘스트를 시작했습니다.",
-            HUDMessage.newQuest_type
+            inserted
+                ? "DEBUG: 극의 해방 퀘스트를 일지에 추가했습니다."
+                : "DEBUG 오류: 극의 퀘스트가 일지에 추가되지 않았습니다. SMAPI 로그를 확인하세요.",
+            inserted ? HUDMessage.newQuest_type : HUDMessage.error_type
         ));
     }
 
@@ -1082,32 +1090,105 @@ internal sealed class ModEntry : Mod
         if (FindQuestInJournal(questId) is not null)
             return;
 
-        MethodInfo? addQuest = Game1.player.GetType().GetMethod(
-            "addQuest",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            binder: null,
-            types: new[] { typeof(string) },
-            modifiers: null
-        );
-
-        if (addQuest is null)
-        {
-            Monitor.Log(
-                $"Could not add custom quest '{questId}': Farmer.addQuest(string) was not found.",
-                LogLevel.Error
-            );
-            return;
-        }
-
         try
         {
-            addQuest.Invoke(Game1.player, new object[] { questId });
+            // Stardew 1.6 supports string quest IDs directly.
+            // Refresh the data asset first so our custom entry is definitely present.
+            Helper.GameContent.InvalidateCache("Data/Quests");
+
+            Dictionary<string, string> questData =
+                Game1.content.Load<Dictionary<string, string>>("Data\\Quests");
+
+            if (!questData.ContainsKey(questId))
+            {
+                Monitor.Log(
+                    $"Custom quest data '{questId}' was not found in Data/Quests after cache refresh.",
+                    LogLevel.Error
+                );
+                return;
+            }
+
+            Game1.player.addQuest(questId);
         }
         catch (Exception ex)
         {
             Monitor.Log(
-                $"Could not add custom quest '{questId}': {ex}",
+                $"Direct addQuest failed for '{questId}': {ex}",
                 LogLevel.Error
+            );
+        }
+
+        if (FindQuestInJournal(questId) is not null)
+        {
+            Monitor.Log(
+                $"Added custom quest '{questId}' to the journal.",
+                LogLevel.Debug
+            );
+            return;
+        }
+
+        // Fallback for unusual game builds: create the Quest object through the
+        // game's own Quest.getQuestFromId(string) and add it to questLog.
+        try
+        {
+            Type? questType = typeof(Game1).Assembly.GetType(
+                "StardewValley.Quests.Quest"
+            );
+
+            MethodInfo? getQuest = questType?.GetMethod(
+                "getQuestFromId",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: new[] { typeof(string) },
+                modifiers: null
+            );
+
+            object? quest = getQuest?.Invoke(
+                null,
+                new object[] { questId }
+            );
+
+            if (quest is not null)
+            {
+                MethodInfo? addMethod = Game1.player.questLog
+                    .GetType()
+                    .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                    .FirstOrDefault(method =>
+                    {
+                        if (!string.Equals(method.Name, "Add", StringComparison.Ordinal))
+                            return false;
+
+                        ParameterInfo[] parameters = method.GetParameters();
+                        return parameters.Length == 1
+                            && parameters[0].ParameterType.IsAssignableFrom(quest.GetType());
+                    });
+
+                addMethod?.Invoke(
+                    Game1.player.questLog,
+                    new[] { quest }
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            Monitor.Log(
+                $"Fallback quest creation failed for '{questId}': {ex}",
+                LogLevel.Error
+            );
+        }
+
+        if (FindQuestInJournal(questId) is null)
+        {
+            Monitor.Log(
+                $"Quest '{questId}' still could not be inserted into the journal.",
+                LogLevel.Error
+            );
+        }
+        else
+        {
+            Monitor.Log(
+                $"Added custom quest '{questId}' to the journal through fallback creation.",
+                LogLevel.Debug
             );
         }
     }
@@ -1615,6 +1696,10 @@ internal sealed class ModEntry : Mod
             Data.LastObservedMonsterKills = currentKills;
             Data.KillCounterInitialized = true;
         }
+
+        // Force Data/Quests to reload through our AssetRequested edit before
+        // attempting to create the custom quest objects.
+        Helper.GameContent.InvalidateCache("Data/Quests");
 
         // Also restores/adds quest journal entries for existing saves already past
         // the level 30 / 50 thresholds.
