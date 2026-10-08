@@ -501,16 +501,20 @@ internal sealed class CombatService
             MultiHitMultiplier(progress, stageBonus)
         );
 
+        Vector2 playerCenter = CenterOf(player.GetBoundingBox());
+        Vector2 focalPoint = playerCenter
+            + DirectionVector(facing) * (stage == 1 ? 86f : stage == 2 ? 108f : 126f);
+
         QueueMultiHit(
             location,
             area,
             perHitDamage,
             hitCount,
-            tickGap: 5,
+            tickGap: 9,
             knockback: 0.01f,
             facing: facing,
-            effectCenter: new Vector2(area.Center.X, area.Center.Y),
-            effectRadius: stage == 1 ? 64f : stage == 2 ? 88f : 112f,
+            effectCenter: focalPoint,
+            effectRadius: stage == 1 ? 72f : stage == 2 ? 98f : 126f,
             visualStyle: 1
         );
 
@@ -564,14 +568,14 @@ internal sealed class CombatService
             knockback: 0.08f
         );
 
-        AddIssenFx(start, end, facing, width, stage);
-
-        // Keep the original straight "cut-through" trail along the entire dash path.
+        // Issen visual = one straight cut-through beam only.
+        // Its visible width exactly matches the real attack width:
+        // stage 1 = 1 tile, stage 2 = 5 tiles, stage 3 = 10 tiles.
         AddLineFx(
             start + new Vector2(32f, 32f),
             end + new Vector2(32f, 32f),
-            width: stage == 1 ? 12f : stage == 2 ? 18f : 24f,
-            ticks: stage == 1 ? 16 : stage == 2 ? 20 : 24
+            width: width,
+            ticks: stage == 1 ? 18 : stage == 2 ? 22 : 26
         );
 
         location.localSound("swordswipe");
@@ -715,11 +719,11 @@ internal sealed class CombatService
             area,
             perHit,
             hitCount,
-            tickGap: 4,
+            tickGap: 8,
             knockback: 0.005f,
             facing: player.FacingDirection,
-            effectCenter: new Vector2(area.Center.X, area.Center.Y),
-            effectRadius: stage == 1 ? 132f : stage == 2 ? 194f : 262f,
+            effectCenter: CenterOf(box),
+            effectRadius: stage == 1 ? 158f : stage == 2 ? 232f : 316f,
             visualStyle: 2
         );
 
@@ -790,18 +794,13 @@ internal sealed class CombatService
             if (Vector2.Distance(playerCenter, monsterCenter) > radiusPixels)
                 continue;
 
-            // Damage is applied at the monster, and the slash effect appears ON the monster.
-            Game1.currentLocation.damageMonster(
-                monsterBox,
+            // Damage is applied directly to the monster with LOS ignored,
+            // so rocks / ore between the farmer and monster do not block the passive.
+            DamageSingleMonsterIgnoringTerrain(
+                Game1.currentLocation,
+                monster,
                 damage,
-                damage,
-                isBomb: false,
-                knockBackModifier: 0f,
-                addedPrecision: 0,
-                critChance: 0f,
-                critMultiplier: 1f,
-                triggerMonsterInvincibleTimer: false,
-                who: Game1.player
+                knockback: 0f
             );
 
             AddArcFx(
@@ -969,23 +968,31 @@ internal sealed class CombatService
             multiplier = Math.Clamp(multiplier, 0.30f, 1f);
             int damage = Math.Max(1, (int)Math.Round(wave.BaseDamage * multiplier));
 
-            bool hit = wave.Location.damageMonster(
-                hitbox,
-                damage,
-                damage,
-                isBomb: false,
-                knockBackModifier: 0.02f,
-                addedPrecision: 0,
-                critChance: 0f,
-                critMultiplier: 1f,
-                triggerMonsterInvincibleTimer: false,
-                who: Game1.player
-            );
+            bool hit = false;
 
-            if (hit)
+            foreach (NPC npc in wave.Location.characters.ToList())
             {
+                if (npc is not Monster monster || monster.Health <= 0)
+                    continue;
+
+                if (!hitbox.Intersects(monster.GetBoundingBox()))
+                    continue;
+
+                if (!DamageSingleMonsterIgnoringTerrain(
+                    wave.Location,
+                    monster,
+                    damage,
+                    knockback: 0.02f
+                ))
+                {
+                    continue;
+                }
+
+                hit = true;
+                wave.HitEvents++;
+
                 AddArcFx(
-                    wave.Position,
+                    CenterOf(monster.GetBoundingBox()),
                     wave.VisualRadius * 0.72f,
                     (float)Math.Atan2(wave.Direction.Y, wave.Direction.X),
                     2.2f,
@@ -993,8 +1000,12 @@ internal sealed class CombatService
                     9
                 );
 
-                wave.HitEvents++;
+                if (wave.HitEvents >= wave.MaxHitEvents)
+                    break;
+            }
 
+            if (hit)
+            {
                 if (wave.HitEvents >= wave.MaxHitEvents)
                 {
                     Projectiles.RemoveAt(i);
@@ -1392,6 +1403,46 @@ internal sealed class CombatService
         );
     }
 
+    private static bool DamageSingleMonsterIgnoringTerrain(
+        GameLocation location,
+        Monster monster,
+        int damage,
+        float knockback,
+        bool guaranteedCritical = false
+    )
+    {
+        if (monster.Health <= 0)
+            return false;
+
+        Rectangle monsterBox = monster.GetBoundingBox();
+        bool previousIgnoreLos = monster.ignoreDamageLOS.Value;
+
+        try
+        {
+            // Stardew's combat code can reject damage through blocked line-of-sight.
+            // Temporarily disabling that LOS restriction lets AoE skills hit through
+            // rocks / ore / placed solid objects while keeping vanilla kill/loot logic.
+            monster.ignoreDamageLOS.Value = true;
+
+            return location.damageMonster(
+                monsterBox,
+                damage,
+                damage,
+                isBomb: false,
+                knockBackModifier: knockback,
+                addedPrecision: 0,
+                critChance: guaranteedCritical ? 1f : 0f,
+                critMultiplier: 1f,
+                triggerMonsterInvincibleTimer: false,
+                who: Game1.player
+            );
+        }
+        finally
+        {
+            monster.ignoreDamageLOS.Value = previousIgnoreLos;
+        }
+    }
+
     private static void DamageMonstersIgnoringTerrain(
         GameLocation location,
         Rectangle area,
@@ -1399,29 +1450,19 @@ internal sealed class CombatService
         float knockback
     )
     {
-        // Target monsters directly by their own hitboxes. This avoids any
-        // terrain/rock between the farmer and the monster affecting the hit.
         foreach (NPC npc in location.characters.ToList())
         {
             if (npc is not Monster monster || monster.Health <= 0)
                 continue;
 
-            Rectangle monsterBox = monster.GetBoundingBox();
-
-            if (!area.Intersects(monsterBox))
+            if (!area.Intersects(monster.GetBoundingBox()))
                 continue;
 
-            location.damageMonster(
-                monsterBox,
+            DamageSingleMonsterIgnoringTerrain(
+                location,
+                monster,
                 damage,
-                damage,
-                isBomb: false,
-                knockBackModifier: knockback,
-                addedPrecision: 0,
-                critChance: 0f,
-                critMultiplier: 1f,
-                triggerMonsterInvincibleTimer: false,
-                who: Game1.player
+                knockback
             );
         }
     }
@@ -1433,19 +1474,29 @@ internal sealed class CombatService
         float knockback
     )
     {
-        return location.damageMonster(
-            area,
-            damage,
-            damage,
-            isBomb: false,
-            knockBackModifier: knockback,
-            addedPrecision: 0,
-            critChance: 1f,
-            // Keep crit multiplier at 1 so the final visible damage remains exactly 99,999.
-            critMultiplier: 1f,
-            triggerMonsterInvincibleTimer: false,
-            who: Game1.player
-        );
+        bool hitAnything = false;
+
+        foreach (NPC npc in location.characters.ToList())
+        {
+            if (npc is not Monster monster || monster.Health <= 0)
+                continue;
+
+            if (!area.Intersects(monster.GetBoundingBox()))
+                continue;
+
+            if (DamageSingleMonsterIgnoringTerrain(
+                location,
+                monster,
+                damage,
+                knockback,
+                guaranteedCritical: true
+            ))
+            {
+                hitAnything = true;
+            }
+        }
+
+        return hitAnything;
     }
 
     // ---------------------------------------------------------------------
@@ -1460,62 +1511,115 @@ internal sealed class CombatService
         int visualStyle
     )
     {
-        Vector2 direction = DirectionVector(facing);
-        Vector2 perpendicular = new(-direction.Y, direction.X);
-
         if (visualStyle == 1)
         {
-            // Basic C: overlapping frontal combo slashes, not a circular spin.
-            float side = ((variant % 3) - 1) * 18f;
-            float forward = (variant % 2 == 0 ? 8f : -6f);
-            Vector2 fxCenter = center + perpendicular * side + direction * forward;
+            // Basic C:
+            // every strike crosses the exact same frontal focal point.
+            // No circular orbiting / hollow center.
+            float baseAngle = FacingAngle(facing);
 
-            float angle = FacingAngle(facing)
-                + (variant % 2 == 0 ? -0.85f : 0.85f)
-                + ((variant / 2) % 2 == 0 ? 0.10f : -0.10f);
-
-            AddArcFx(
-                fxCenter,
-                radius: baseRadius + (variant % 3) * 7f,
-                centerAngle: angle,
-                sweep: 2.18f,
-                width: 12.5f + (variant % 2) * 2f,
-                ticks: 11
-            );
-            return;
-        }
-
-        if (visualStyle == 2)
-        {
-            // Ohgi C: dense all-around sword storm. Multiple large crossing arcs
-            // are emitted per hit so it reads as rapid surrounding slashes.
-            int slashCount = variant % 3 == 0 ? 3 : 2;
-
-            for (int j = 0; j < slashCount; j++)
+            float angleOffset = variant switch
             {
-                float seed = variant * 1.27f + j * 2.05f;
-                float angle = seed + (variant % 2 == 0 ? 0.35f : -0.35f);
-                float offsetRadius = baseRadius * (0.12f + 0.10f * j);
+                0 => -0.78f,
+                1 => 0.72f,
+                2 => -1.08f,
+                3 => 1.02f,
+                4 => -0.42f,
+                _ => 0.38f
+            };
 
-                Vector2 fxCenter = center + new Vector2(
-                    MathF.Cos(seed) * offsetRadius,
-                    MathF.Sin(seed) * offsetRadius
+            float angle = baseAngle + angleOffset;
+            Vector2 slashDirection = new(
+                MathF.Cos(angle),
+                MathF.Sin(angle)
+            );
+
+            float halfLength = baseRadius * (1.05f + (variant % 3) * 0.10f);
+
+            AddLineFx(
+                center - slashDirection * halfLength,
+                center + slashDirection * halfLength,
+                width: 13f + (variant % 2) * 2.5f,
+                ticks: 13
+            );
+
+            // Every other hit gets a second crossing blade so the same target point
+            // looks repeatedly carved from different angles.
+            if (variant % 2 == 1)
+            {
+                float secondAngle = angle + 1.18f;
+                Vector2 secondDirection = new(
+                    MathF.Cos(secondAngle),
+                    MathF.Sin(secondAngle)
                 );
 
-                AddArcFx(
-                    fxCenter,
-                    radius: baseRadius * (0.72f + 0.08f * ((variant + j) % 3)),
-                    centerAngle: angle,
-                    sweep: 2.35f,
-                    width: 18f + (variant % 3) * 2.5f + j * 1.5f,
-                    ticks: 13
+                AddLineFx(
+                    center - secondDirection * (halfLength * 0.82f),
+                    center + secondDirection * (halfLength * 0.82f),
+                    width: 10f,
+                    ticks: 11
                 );
             }
 
             return;
         }
 
-        // Default path multi-hit style used by dash attacks.
+        if (visualStyle == 2)
+        {
+            // Ohgi C "검술의 정점":
+            // large, thick, overlapping finishing slashes that ALL pass through
+            // the player center. This is intentionally much bigger than Basic C.
+            int slashCount = 3 + (variant % 2);
+            float seed = variant * 0.73f;
+
+            for (int j = 0; j < slashCount; j++)
+            {
+                float angle =
+                    seed
+                    + j * (MathF.PI / slashCount)
+                    + (variant % 2 == 0 ? 0.22f : -0.22f);
+
+                Vector2 slashDirection = new(
+                    MathF.Cos(angle),
+                    MathF.Sin(angle)
+                );
+
+                float halfLength =
+                    baseRadius
+                    * (1.00f + j * 0.09f + (variant % 3) * 0.06f);
+
+                AddLineFx(
+                    center - slashDirection * halfLength,
+                    center + slashDirection * halfLength,
+                    width: 22f + j * 3.0f + (variant % 3) * 2.0f,
+                    ticks: 16
+                );
+            }
+
+            // A huge X-like finisher pulse every third strike.
+            if (variant % 3 == 2)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    float angle = MathF.PI / 4f + j * MathF.PI / 2f + seed * 0.25f;
+                    Vector2 direction = new(
+                        MathF.Cos(angle),
+                        MathF.Sin(angle)
+                    );
+
+                    AddLineFx(
+                        center - direction * (baseRadius * 1.28f),
+                        center + direction * (baseRadius * 1.28f),
+                        width: 30f,
+                        ticks: 18
+                    );
+                }
+            }
+
+            return;
+        }
+
+        // Default dash multi-hit style.
         AddArcFx(
             center,
             baseRadius + (variant % 3 - 1) * 9f,
@@ -1561,53 +1665,6 @@ internal sealed class CombatService
                 width: 9f + i * 1.5f,
                 ticks: 11 + i * 2
             );
-        }
-    }
-
-    private void AddIssenFx(
-        Vector2 start,
-        Vector2 end,
-        int facing,
-        int widthPixels,
-        int stage
-    )
-    {
-        Vector2 startCenter = start + new Vector2(32f, 32f);
-        Vector2 endCenter = end + new Vector2(32f, 32f);
-        Vector2 direction = DirectionVector(facing);
-        Vector2 perpendicular = new(-direction.Y, direction.X);
-
-        int laneCount = stage switch
-        {
-            1 => 1,
-            2 => 5,
-            _ => 9
-        };
-
-        float spread = Math.Max(0f, widthPixels - 64f);
-
-        for (int lane = 0; lane < laneCount; lane++)
-        {
-            float laneT = laneCount == 1 ? 0.5f : lane / (float)(laneCount - 1);
-            float offset = -spread / 2f + spread * laneT;
-
-            for (int along = 1; along <= 3 + stage; along++)
-            {
-                float t = along / (float)(4 + stage);
-                Vector2 center =
-                    Vector2.Lerp(startCenter, endCenter, t)
-                    + perpendicular * offset;
-
-                AddArcFx(
-                    center,
-                    radius: 38f + stage * 11f + along * 3f,
-                    centerAngle: FacingAngle(facing)
-                        + ((lane + along) % 2 == 0 ? -0.55f : 0.55f),
-                    sweep: 2.10f + stage * 0.10f,
-                    width: 9f + stage * 2.5f,
-                    ticks: 12 + stage * 3
-                );
-            }
         }
     }
 
