@@ -59,9 +59,9 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         ["OhgiA"] = new[]
         {
-            "1단계: 4칸 전진 · 폭 1칸 · 99999 확정 치명타",
-            "2단계: 6칸 전진 · 폭 5칸 · 99999 확정 치명타",
-            "3단계: 8칸 전진 · 폭 10칸 · 99999 확정 치명타"
+            "1단계: 5칸 전진 · 폭 1칸 · 99999 확정 치명타",
+            "2단계: 8칸 전진 · 폭 4칸 · 99999 확정 치명타",
+            "3단계: 맵 끝까지 돌진 · 폭 9칸 · 99999 확정 치명타"
         },
         ["OhgiB"] = new[]
         {
@@ -658,20 +658,58 @@ internal sealed class SkillTreeMenu : IClickableMenu
         string[] lines = SkillDescriptions[id];
         string state = GetStateText(id);
 
-        int tooltipWidth = Math.Min(560, Math.Max(460, width / 2 - 60));
-        int tooltipHeight = 330;
+        int tooltipWidth = Math.Min(
+            620,
+            Math.Max(500, width / 2 - 36)
+        );
 
-        // 고정형 상세 카드:
-        // 마우스가 왼쪽에 있으면 오른쪽에, 오른쪽에 있으면 왼쪽에 표시.
-        bool showOnRight = HoverX < xPositionOnScreen + width / 2;
+        int contentWidth = tooltipWidth - 44;
+        int descriptionWidth = Math.Max(220, contentWidth - 142);
+
+        string[] wrapped = new string[3];
+        int[] rowHeights = new int[3];
+
+        for (int i = 0; i < 3; i++)
+        {
+            string source = lines.Length > i ? lines[i] : "";
+            wrapped[i] = Game1.parseText(
+                source,
+                Game1.smallFont,
+                descriptionWidth
+            );
+
+            float textHeight = Game1.smallFont.MeasureString(wrapped[i]).Y;
+            rowHeights[i] = Math.Max(50, (int)Math.Ceiling(textHeight) + 18);
+        }
+
+        int headerHeight = 128;
+        int footerHeight = 74;
+        int stageBlockHeight = rowHeights.Sum();
+        int tooltipHeight = headerHeight + stageBlockHeight + footerHeight + 26;
+
+        tooltipHeight = Math.Min(
+            tooltipHeight,
+            height - 134
+        );
+
+        bool showOnRight =
+            HoverX < xPositionOnScreen + width / 2;
 
         int x = showOnRight
             ? xPositionOnScreen + width - tooltipWidth - 26
             : xPositionOnScreen + 26;
 
-        int y = yPositionOnScreen + 112;
+        int y = Math.Max(
+            yPositionOnScreen + 88,
+            yPositionOnScreen + (height - tooltipHeight) / 2
+        );
 
-        Rectangle card = new(x, y, tooltipWidth, tooltipHeight);
+        Rectangle card = new(
+            x,
+            y,
+            tooltipWidth,
+            tooltipHeight
+        );
 
         IClickableMenu.drawTextureBox(
             b,
@@ -692,11 +730,16 @@ internal sealed class SkillTreeMenu : IClickableMenu
         b.Draw(
             Game1.staminaRect,
             inner,
-            new Color(250, 226, 171) * 0.88f
+            new Color(250, 226, 171) * 0.90f
         );
 
-        // 아이콘
-        Rectangle iconFrame = new(card.X + 22, card.Y + 22, 88, 88);
+        Rectangle iconFrame = new(
+            card.X + 22,
+            card.Y + 20,
+            82,
+            82
+        );
+
         IClickableMenu.drawTextureBox(
             b,
             iconFrame.X,
@@ -707,10 +750,10 @@ internal sealed class SkillTreeMenu : IClickableMenu
         );
 
         Rectangle icon = new(
-            iconFrame.X + 8,
-            iconFrame.Y + 8,
-            iconFrame.Width - 16,
-            iconFrame.Height - 16
+            iconFrame.X + 7,
+            iconFrame.Y + 7,
+            iconFrame.Width - 14,
+            iconFrame.Height - 14
         );
 
         b.Draw(
@@ -721,12 +764,17 @@ internal sealed class SkillTreeMenu : IClickableMenu
                 : Color.White
         );
 
-        // 제목
-        Utility.drawTextWithShadow(
-            b,
+        string wrappedTitle = Game1.parseText(
             title,
             Game1.smallFont,
-            new Vector2(card.X + 132, card.Y + 30),
+            tooltipWidth - 150
+        );
+
+        Utility.drawTextWithShadow(
+            b,
+            wrappedTitle,
+            Game1.smallFont,
+            new Vector2(card.X + 122, card.Y + 24),
             new Color(94, 50, 24)
         );
 
@@ -741,16 +789,15 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             stageText,
             Game1.smallFont,
-            new Vector2(card.X + 132, card.Y + 70),
+            new Vector2(card.X + 122, card.Y + 72),
             currentStage > 0
                 ? new Color(58, 118, 53)
                 : Color.DimGray
         );
 
-        // 구분선
         Rectangle headerLine = new(
             card.X + 22,
-            card.Y + 124,
+            card.Y + 116,
             card.Width - 44,
             3
         );
@@ -761,47 +808,44 @@ internal sealed class SkillTreeMenu : IClickableMenu
             new Color(154, 100, 52) * 0.75f
         );
 
-        // 단계별 상세 설명
-        int rowY = card.Y + 143;
+        int rowY = card.Y + 130;
 
-        DrawTooltipStageRow(
-            b,
-            card.X + 26,
-            rowY,
-            "I",
-            progress.Stage1,
-            lines.Length > 0 ? lines[0] : "",
-            stageIndex: 1
+        for (int i = 0; i < 3; i++)
+        {
+            int invested = i switch
+            {
+                0 => progress.Stage1,
+                1 => progress.Stage2,
+                _ => progress.Stage3
+            };
+
+            DrawTooltipStageRow(
+                b,
+                card.X + 24,
+                rowY,
+                i switch
+                {
+                    0 => "I",
+                    1 => "II",
+                    _ => "III"
+                },
+                invested,
+                wrapped[i],
+                tooltipWidth - 48,
+                rowHeights[i]
+            );
+
+            rowY += rowHeights[i];
+        }
+
+        int footerY = Math.Min(
+            rowY + 8,
+            card.Bottom - footerHeight
         );
 
-        rowY += 48;
-
-        DrawTooltipStageRow(
-            b,
-            card.X + 26,
-            rowY,
-            "II",
-            progress.Stage2,
-            lines.Length > 1 ? lines[1] : "",
-            stageIndex: 2
-        );
-
-        rowY += 48;
-
-        DrawTooltipStageRow(
-            b,
-            card.X + 26,
-            rowY,
-            "III",
-            progress.Stage3,
-            lines.Length > 2 ? lines[2] : "",
-            stageIndex: 3
-        );
-
-        // 하단 상태 영역
         Rectangle footerLine = new(
             card.X + 22,
-            card.Bottom - 66,
+            footerY,
             card.Width - 44,
             3
         );
@@ -812,19 +856,27 @@ internal sealed class SkillTreeMenu : IClickableMenu
             new Color(154, 100, 52) * 0.60f
         );
 
+        string totalText = $"총 투자 {progress.TotalPoints}/15";
+
         Utility.drawTextWithShadow(
             b,
-            $"총 투자 {progress.TotalPoints}/15",
+            totalText,
             Game1.smallFont,
-            new Vector2(card.X + 28, card.Bottom - 52),
+            new Vector2(card.X + 28, footerY + 16),
             new Color(96, 58, 28)
+        );
+
+        string wrappedState = Game1.parseText(
+            state,
+            Game1.smallFont,
+            tooltipWidth - 210
         );
 
         Utility.drawTextWithShadow(
             b,
-            state,
+            wrappedState,
             Game1.smallFont,
-            new Vector2(card.X + 210, card.Bottom - 52),
+            new Vector2(card.X + 190, footerY + 16),
             GetReadableStateColor(id)
         );
     }
@@ -835,17 +887,11 @@ internal sealed class SkillTreeMenu : IClickableMenu
         int y,
         string roman,
         int invested,
-        string description,
-        int stageIndex
+        string wrappedDescription,
+        int rowWidth,
+        int rowHeight
     )
     {
-        Rectangle row = new(
-            x,
-            y,
-            500,
-            40
-        );
-
         Color rowColor;
 
         if (invested >= 5)
@@ -855,9 +901,16 @@ internal sealed class SkillTreeMenu : IClickableMenu
         else
             rowColor = new Color(222, 209, 180);
 
+        Rectangle row = new(
+            x,
+            y,
+            rowWidth,
+            rowHeight - 4
+        );
+
         b.Draw(
             Game1.staminaRect,
-            new Rectangle(row.X, row.Y, Math.Min(row.Width, width / 2 - 84), row.Height),
+            row,
             rowColor * 0.72f
         );
 
@@ -875,7 +928,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             b,
             $"{invested}/5",
             Game1.smallFont,
-            new Vector2(row.X + 54, row.Y + 8),
+            new Vector2(row.X + 48, row.Y + 8),
             invested >= 5
                 ? new Color(45, 110, 46)
                 : new Color(109, 77, 48)
@@ -883,9 +936,9 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         Utility.drawTextWithShadow(
             b,
-            description,
+            wrappedDescription,
             Game1.smallFont,
-            new Vector2(row.X + 116, row.Y + 8),
+            new Vector2(row.X + 114, row.Y + 8),
             Game1.textColor
         );
     }

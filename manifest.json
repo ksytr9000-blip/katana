@@ -1,8 +1,8 @@
 {
-  "Name": "Sword Mastery",
+  "Name": "검술 마스터리",
   "Author": "Prototype",
   "Version": "0.1.0",
-  "Description": "Independent swordsmanship progression system for Stardew Valley.",
+  "Description": "검술 레벨, 스킬 트리, 오의와 극의를 추가하는 독립 검술 성장 모드.",
   "UniqueID": "Prototype.SwordMastery",
   "EntryDll": "SwordMastery.dll",
   "MinimumApiVersion": "4.3.0"

@@ -271,21 +271,48 @@ internal sealed class CombatService
             Vector2 start = WorldToScreen(fx.Start);
             Vector2 end = WorldToScreen(fx.End);
 
-            DrawLine(
-                b,
-                start,
-                end,
-                fx.Width,
-                new Color(70, 205, 255) * alpha
-            );
+            if (fx.Style == 1)
+            {
+                DrawBladeSlash(
+                    b,
+                    start,
+                    end,
+                    fx.Width,
+                    new Color(55, 195, 255) * alpha,
+                    Color.White * Math.Min(1f, alpha + 0.18f),
+                    finisherStyle: false
+                );
+            }
+            else if (fx.Style == 2)
+            {
+                DrawBladeSlash(
+                    b,
+                    start,
+                    end,
+                    fx.Width,
+                    new Color(35, 150, 255) * alpha,
+                    Color.White * Math.Min(1f, alpha + 0.22f),
+                    finisherStyle: true
+                );
+            }
+            else
+            {
+                DrawLine(
+                    b,
+                    start,
+                    end,
+                    fx.Width,
+                    new Color(70, 205, 255) * alpha
+                );
 
-            DrawLine(
-                b,
-                start,
-                end,
-                Math.Max(2f, fx.Width * 0.28f),
-                Color.White * Math.Min(1f, alpha + 0.15f)
-            );
+                DrawLine(
+                    b,
+                    start,
+                    end,
+                    Math.Max(2f, fx.Width * 0.28f),
+                    Color.White * Math.Min(1f, alpha + 0.15f)
+                );
+            }
         }
 
         foreach (SwordWave wave in Projectiles)
@@ -536,28 +563,33 @@ internal sealed class CombatService
 
         Vector2 start = player.Position;
 
-        // Issen max movement range: 4 / 6 / 8 tiles.
+        // Issen travel range:
+        // 1 = 5 tiles, 2 = roughly the old stage-3 distance (8 tiles),
+        // 3 = almost to the end of the current map in the facing direction.
         float maxDistancePixels = stage switch
         {
-            1 => 4f * 64f,
-            2 => 6f * 64f,
-            _ => 8f * 64f
+            1 => 5f * 64f,
+            2 => 8f * 64f,
+            _ => GetIssenMapLength(location, facing)
         };
 
-        DashForwardPixels(player, location, facing, maxDistancePixels);
+        DashIssenForward(player, location, facing, maxDistancePixels);
         Vector2 end = player.Position;
 
-        // User-requested path width:
-        // stage 1 = 1 tile, stage 2 = 5 tiles, stage 3 = 10 tiles.
+        // Narrower by one tile per stage than PATCH 16:
+        // 1 = 1 tile, 2 = 4 tiles, 3 = 9 tiles.
         int width = stage switch
         {
             1 => 1 * 64,
-            2 => 5 * 64,
-            _ => 10 * 64
+            2 => 4 * 64,
+            _ => 9 * 64
         };
 
         Rectangle path = BuildPathRectangle(start, end, width);
-        ClearSwordCuttableObstacles(location, path);
+
+        // Issen annihilates mine-related breakables inside the cut path,
+        // but never touches machines, chests, crops, decorations, flooring, etc.
+        DestroyMiningObstaclesInArea(location, path);
 
         // Issen never scales its damage.
         // It is a true finishing technique: exact 99,999 damage and guaranteed critical.
@@ -569,8 +601,7 @@ internal sealed class CombatService
         );
 
         // Issen visual = one straight cut-through beam only.
-        // Its visible width exactly matches the real attack width:
-        // stage 1 = 1 tile, stage 2 = 5 tiles, stage 3 = 10 tiles.
+        // Visible width exactly matches the real attack width.
         AddLineFx(
             start + new Vector2(32f, 32f),
             end + new Vector2(32f, 32f),
@@ -713,6 +744,9 @@ internal sealed class CombatService
         );
 
         AnimateSwordSkill(player, 23f);
+
+        // The pinnacle shreds mine debris in its full damage radius.
+        DestroyMiningObstaclesInArea(location, area);
 
         QueueMultiHit(
             location,
@@ -959,6 +993,10 @@ internal sealed class CombatService
                 wave.HitboxRadius * 2,
                 wave.HitboxRadius * 2
             );
+
+            // Ohgi sword-wave cuts through mine debris as it travels.
+            // Non-mining objects are intentionally left untouched.
+            DestroyMiningObstaclesInArea(wave.Location, hitbox);
 
             float distanceTiles = wave.DistanceTravelled / 64f;
             float multiplier = 1f
@@ -1207,6 +1245,61 @@ internal sealed class CombatService
         }
     }
 
+    private static float GetIssenMapLength(
+        GameLocation location,
+        int facing
+    )
+    {
+        var backLayer = location.Map.GetLayer("Back");
+
+        if (backLayer is null)
+            return 24f * 64f;
+
+        int tiles = facing is 1 or 3
+            ? backLayer.LayerWidth
+            : backLayer.LayerHeight;
+
+        // Map wall / protected object collision still stops the dash naturally.
+        return Math.Max(12, tiles - 1) * 64f;
+    }
+
+    private static void DashIssenForward(
+        Farmer player,
+        GameLocation location,
+        int facing,
+        float maxDistancePixels
+    )
+    {
+        Vector2 direction = DirectionVector(facing);
+        Vector2 start = player.Position;
+        const float step = 8f;
+
+        for (int i = 0; i < 2048; i++)
+        {
+            float travelled = Vector2.Distance(start, player.Position);
+            if (travelled >= maxDistancePixels)
+                break;
+
+            float remaining = maxDistancePixels - travelled;
+            Vector2 delta = direction * Math.Min(step, remaining);
+            Vector2 nextPosition = player.Position + delta;
+
+            Rectangle nextBox = player.GetBoundingBox();
+            nextBox.Offset(
+                (int)Math.Round(delta.X),
+                (int)Math.Round(delta.Y)
+            );
+
+            // Break only mine-related debris before collision testing.
+            DestroyMiningObstaclesInArea(location, nextBox);
+
+            if (IsHardDashBlocker(location, nextBox))
+                break;
+
+            player.Position = nextPosition;
+        }
+    }
+
     private static bool IsHardDashBlocker(
         GameLocation location,
         Rectangle nextBox
@@ -1315,6 +1408,160 @@ internal sealed class CombatService
             return terrain is not Grass;
 
         return false;
+    }
+
+    private static bool IsMiningDestructibleObject(
+        StardewValley.Object obj,
+        GameLocation location
+    )
+    {
+        if (obj.bigCraftable.Value)
+            return false;
+
+        string name = obj.Name ?? "";
+        string displayName = obj.DisplayName ?? "";
+        string id = obj.ItemId ?? "";
+
+        bool nameMatch =
+            name.Contains("Stone", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Rock", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Ore", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Weed", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Fiber", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Twig", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Branch", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("돌", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("광석", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("잡초", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("섬유", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("나뭇가지", StringComparison.OrdinalIgnoreCase);
+
+        if (nameMatch)
+            return true;
+
+        // Vanilla mine node / stone / twig / weed IDs commonly used as placed debris.
+        // Keep this as a whitelist so machines, chests, decorations, crops, and flooring
+        // are never removed by the combat skill.
+        string[] miningIds =
+        {
+            "2", "4", "6", "8", "10", "12", "14",
+            "25", "32", "34", "36", "38", "40", "42", "44", "46",
+            "75", "76", "77", "95",
+            "290", "294", "295",
+            "343", "450",
+            "668", "670", "674", "675", "676", "677", "678", "679",
+            "750", "751", "760", "762", "764", "765",
+            "816", "817", "818", "819", "843", "844", "845", "846", "847"
+        };
+
+        if (miningIds.Contains(id))
+            return true;
+
+        // Crates/barrels are only considered destructible in mine-like locations.
+        string locationName = location.NameOrUniqueName ?? "";
+        bool mineLike =
+            locationName.Contains("Mine", StringComparison.OrdinalIgnoreCase)
+            || locationName.Contains("Skull", StringComparison.OrdinalIgnoreCase)
+            || locationName.Contains("Volcano", StringComparison.OrdinalIgnoreCase)
+            || locationName.Contains("Quarry", StringComparison.OrdinalIgnoreCase);
+
+        if (mineLike
+            && (name.Contains("Crate", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Barrel", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Container", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static void DestroyMiningObstaclesInArea(
+        GameLocation location,
+        Rectangle area
+    )
+    {
+        List<Vector2> remove = new();
+
+        foreach (Vector2 tile in location.objects.Keys.ToList())
+        {
+            StardewValley.Object obj = location.objects[tile];
+
+            if (!IsMiningDestructibleObject(obj, location))
+                continue;
+
+            Rectangle tileBox = new(
+                (int)tile.X * 64,
+                (int)tile.Y * 64,
+                64,
+                64
+            );
+
+            if (tileBox.Intersects(area))
+                remove.Add(tile);
+        }
+
+        foreach (Vector2 tile in remove)
+        {
+            if (!location.objects.TryGetValue(tile, out StardewValley.Object? obj))
+                continue;
+
+            string name = obj.Name ?? "";
+
+            // Let vanilla object logic handle stone/ore/wood breakage when possible,
+            // so normal debris/drop behavior is preserved.
+            Tool tool =
+                name.Contains("Twig", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Branch", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Wood", StringComparison.OrdinalIgnoreCase)
+                    ? new Axe()
+                    : new Pickaxe();
+
+            bool destroyed = false;
+
+            for (int hit = 0; hit < 32; hit++)
+            {
+                if (!location.objects.ContainsKey(tile))
+                {
+                    destroyed = true;
+                    break;
+                }
+
+                if (obj.performToolAction(tool, location))
+                {
+                    location.objects.Remove(tile);
+                    destroyed = true;
+                    break;
+                }
+            }
+
+            // Weed/fiber/container variants can ignore pickaxe/axe logic.
+            // They're already protected by the strict mining-only whitelist,
+            // so remove them as a guaranteed fallback.
+            if (!destroyed && location.objects.ContainsKey(tile))
+                location.objects.Remove(tile);
+        }
+
+        // Grass/fiber terrain is safe to clear; crops/trees/fruit trees/hoe dirt are not.
+        List<Vector2> terrainRemove = new();
+
+        foreach (Vector2 tile in location.terrainFeatures.Keys.ToList())
+        {
+            if (location.terrainFeatures[tile] is not Grass)
+                continue;
+            Rectangle tileBox = new(
+                (int)tile.X * 64,
+                (int)tile.Y * 64,
+                64,
+                64
+            );
+
+            if (tileBox.Intersects(area))
+                terrainRemove.Add(tile);
+        }
+
+        foreach (Vector2 tile in terrainRemove)
+            location.terrainFeatures.Remove(tile);
     }
 
     private static void ClearSwordCuttableObstacles(
@@ -1514,8 +1761,8 @@ internal sealed class CombatService
         if (visualStyle == 1)
         {
             // Basic C:
-            // every strike crosses the exact same frontal focal point.
-            // No circular orbiting / hollow center.
+            // every strike slices through the exact same frontal focal point.
+            // Use a tapered blade-shaped effect instead of a uniform-width bar.
             float baseAngle = FacingAngle(facing);
 
             float angleOffset = variant switch
@@ -1536,15 +1783,15 @@ internal sealed class CombatService
 
             float halfLength = baseRadius * (1.05f + (variant % 3) * 0.10f);
 
-            AddLineFx(
+            AddBladeSlashFx(
                 center - slashDirection * halfLength,
                 center + slashDirection * halfLength,
-                width: 13f + (variant % 2) * 2.5f,
-                ticks: 13
+                maxWidth: 18f + (variant % 2) * 2.5f,
+                ticks: 14,
+                finisherStyle: false
             );
 
-            // Every other hit gets a second crossing blade so the same target point
-            // looks repeatedly carved from different angles.
+            // Alternate strikes cross the same target point from a second angle.
             if (variant % 2 == 1)
             {
                 float secondAngle = angle + 1.18f;
@@ -1553,11 +1800,12 @@ internal sealed class CombatService
                     MathF.Sin(secondAngle)
                 );
 
-                AddLineFx(
+                AddBladeSlashFx(
                     center - secondDirection * (halfLength * 0.82f),
                     center + secondDirection * (halfLength * 0.82f),
-                    width: 10f,
-                    ticks: 11
+                    maxWidth: 14f,
+                    ticks: 12,
+                    finisherStyle: false
                 );
             }
 
@@ -1567,17 +1815,17 @@ internal sealed class CombatService
         if (visualStyle == 2)
         {
             // Ohgi C "검술의 정점":
-            // large, thick, overlapping finishing slashes that ALL pass through
-            // the player center. This is intentionally much bigger than Basic C.
-            int slashCount = 3 + (variant % 2);
-            float seed = variant * 0.73f;
+            // RPG-finisher style. Large layered blade slashes all pass through
+            // the player center, with thicker glow and overlapping angles.
+            int slashCount = 4 + (variant % 3);
+            float seed = variant * 0.71f;
 
             for (int j = 0; j < slashCount; j++)
             {
                 float angle =
                     seed
                     + j * (MathF.PI / slashCount)
-                    + (variant % 2 == 0 ? 0.22f : -0.22f);
+                    + (variant % 2 == 0 ? 0.18f : -0.18f);
 
                 Vector2 slashDirection = new(
                     MathF.Cos(angle),
@@ -1586,32 +1834,38 @@ internal sealed class CombatService
 
                 float halfLength =
                     baseRadius
-                    * (1.00f + j * 0.09f + (variant % 3) * 0.06f);
+                    * (1.04f + j * 0.08f + (variant % 3) * 0.05f);
 
-                AddLineFx(
+                AddBladeSlashFx(
                     center - slashDirection * halfLength,
                     center + slashDirection * halfLength,
-                    width: 22f + j * 3.0f + (variant % 3) * 2.0f,
-                    ticks: 16
+                    maxWidth: 30f + j * 3.5f + (variant % 3) * 2.5f,
+                    ticks: 18,
+                    finisherStyle: true
                 );
             }
 
-            // A huge X-like finisher pulse every third strike.
-            if (variant % 3 == 2)
+            // Finisher pulse: two massive crossing cuts.
+            if (variant % 2 == 1)
             {
                 for (int j = 0; j < 2; j++)
                 {
-                    float angle = MathF.PI / 4f + j * MathF.PI / 2f + seed * 0.25f;
+                    float angle =
+                        MathF.PI / 4f
+                        + j * MathF.PI / 2f
+                        + seed * 0.22f;
+
                     Vector2 direction = new(
                         MathF.Cos(angle),
                         MathF.Sin(angle)
                     );
 
-                    AddLineFx(
-                        center - direction * (baseRadius * 1.28f),
-                        center + direction * (baseRadius * 1.28f),
-                        width: 30f,
-                        ticks: 18
+                    AddBladeSlashFx(
+                        center - direction * (baseRadius * 1.34f),
+                        center + direction * (baseRadius * 1.34f),
+                        maxWidth: 42f,
+                        ticks: 21,
+                        finisherStyle: true
                     );
                 }
             }
@@ -1644,6 +1898,25 @@ internal sealed class CombatService
             Width = width,
             Ticks = ticks,
             MaxTicks = ticks
+        });
+    }
+
+    private void AddBladeSlashFx(
+        Vector2 start,
+        Vector2 end,
+        float maxWidth,
+        int ticks,
+        bool finisherStyle
+    )
+    {
+        LineEffects.Add(new LineFx
+        {
+            Start = start,
+            End = end,
+            Width = maxWidth,
+            Ticks = ticks,
+            MaxTicks = ticks,
+            Style = finisherStyle ? 2 : 1
         });
     }
 
@@ -1820,6 +2093,84 @@ internal sealed class CombatService
         }
     }
 
+    private static void DrawBladeSlash(
+        SpriteBatch b,
+        Vector2 start,
+        Vector2 end,
+        float maxWidth,
+        Color outerColor,
+        Color coreColor,
+        bool finisherStyle
+    )
+    {
+        Vector2 delta = end - start;
+        float length = delta.Length();
+
+        if (length <= 0.01f)
+            return;
+
+        int segments = finisherStyle ? 24 : 18;
+        Vector2 direction = delta / length;
+        Vector2 perpendicular = new(-direction.Y, direction.X);
+
+        for (int i = 0; i < segments; i++)
+        {
+            float t0 = i / (float)segments;
+            float t1 = (i + 1f) / segments;
+            float tm = (t0 + t1) * 0.5f;
+
+            Vector2 segStart = Vector2.Lerp(start, end, t0);
+            Vector2 segEnd = Vector2.Lerp(start, end, t1);
+
+            // Sharp at both ends, widest around the middle like a real slash trail.
+            float taper = MathF.Sin(MathF.PI * tm);
+            taper = MathF.Pow(Math.Max(0f, taper), finisherStyle ? 0.52f : 0.68f);
+
+            float width = Math.Max(1.2f, maxWidth * taper);
+            float coreWidth = Math.Max(1f, width * (finisherStyle ? 0.34f : 0.26f));
+
+            if (finisherStyle)
+            {
+                // Broad glow around the finishing cut.
+                DrawLine(
+                    b,
+                    segStart,
+                    segEnd,
+                    width * 1.45f,
+                    outerColor * 0.28f
+                );
+
+                // Slight offset gleams make the slash feel layered rather than flat.
+                float offset = MathF.Sin(tm * MathF.PI) * 2.5f;
+                DrawLine(
+                    b,
+                    segStart + perpendicular * offset,
+                    segEnd + perpendicular * offset,
+                    width,
+                    outerColor
+                );
+            }
+            else
+            {
+                DrawLine(
+                    b,
+                    segStart,
+                    segEnd,
+                    width,
+                    outerColor
+                );
+            }
+
+            DrawLine(
+                b,
+                segStart,
+                segEnd,
+                coreWidth,
+                coreColor
+            );
+        }
+    }
+
     private static void DrawLine(
         SpriteBatch b,
         Vector2 start,
@@ -1898,6 +2249,9 @@ internal sealed class CombatService
         public float Width { get; set; }
         public int Ticks { get; set; }
         public int MaxTicks { get; set; }
+
+        // 0 = uniform beam, 1 = tapered blade slash, 2 = layered finisher slash.
+        public int Style { get; set; }
     }
 
     private sealed class ArcFx
