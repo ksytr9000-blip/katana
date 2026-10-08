@@ -686,7 +686,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
         }
 
         int headerHeight = 128;
-        int footerHeight = 74;
+        int footerHeight = 108;
         int stageBlockHeight = rowHeights.Sum();
         int tooltipHeight = headerHeight + stageBlockHeight + footerHeight + 26;
 
@@ -861,25 +861,27 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         string totalText = $"총 투자 {progress.TotalPoints}/15";
 
+        // Footer is now two separate rows so "총 투자" and the state/action
+        // text never overlap, even with longer Korean labels.
         Utility.drawTextWithShadow(
             b,
             totalText,
             Game1.smallFont,
-            new Vector2(card.X + 28, footerY + 16),
+            new Vector2(card.X + 28, footerY + 14),
             new Color(96, 58, 28)
         );
 
         string wrappedState = Game1.parseText(
             state,
             Game1.smallFont,
-            tooltipWidth - 210
+            tooltipWidth - 68
         );
 
         Utility.drawTextWithShadow(
             b,
             wrappedState,
             Game1.smallFont,
-            new Vector2(card.X + 190, footerY + 16),
+            new Vector2(card.X + 28, footerY + 52),
             GetReadableStateColor(id)
         );
     }

@@ -151,13 +151,13 @@ internal sealed class ModEntry : Mod
                 quests[OhgiQuestId] =
                     "Basic/[오의]새로운 경지를 깨우칠 것 같다."
                     + "/새로운 경지가 손에 잡힐 듯하다. 실전 속에서 감각을 완성해 보자."
-                    + "/어둠의 해골 30마리 사냥"
+                    + "/목표 - 어둠의 해골 사냥: 0/30"
                     + "//-1/0/-1/false/";
 
                 quests[UltimateQuestId] =
                     "Basic/[극의]검술의 극에 달할 수 있을 것 같다."
                     + "/검술의 극에 닿기 위해서는 용을 넘어 그 힘까지 받아들여야 한다."
-                    + "/용 50마리 사냥, 용의 보주 10개 수집"
+                    + "/목표 1 - 용 사냥: 0/50 | 목표 2 - 용의 보주: 0/10"
                     + "//-1/0/-1/false/";
             });
         }
@@ -1036,9 +1036,18 @@ internal sealed class ModEntry : Mod
         if (!Data.OhgiQuestStarted || Data.OhgiQuestCompleted)
             return;
 
+        string objective =
+            $"목표 - 어둠의 해골 사냥: {Math.Min(30, Data.OhgiSkullKills)}/30";
+
         SetQuestObjective(
             OhgiQuestId,
-            $"어둠의 해골 사냥 ({Math.Min(30, Data.OhgiSkullKills)}/30)"
+            objective
+        );
+
+        SetQuestProgressDescription(
+            OhgiQuestId,
+            "새로운 경지가 손에 잡힐 듯하다. 실전 속에서 감각을 완성해 보자.",
+            objective
         );
     }
 
@@ -1052,10 +1061,19 @@ internal sealed class ModEntry : Mod
             CountInventoryItem($"(O){DragonOrbId}")
         );
 
+        string objective =
+            $"목표 1 - 용 사냥: {Math.Min(50, Data.UltimateDragonKills)}/50\n"
+            + $"목표 2 - 용의 보주: {orbs}/10";
+
         SetQuestObjective(
             UltimateQuestId,
-            $"용 사냥 ({Math.Min(50, Data.UltimateDragonKills)}/50)\n"
-            + $"용의 보주 ({orbs}/10)"
+            objective
+        );
+
+        SetQuestProgressDescription(
+            UltimateQuestId,
+            "검술의 극에 닿기 위해서는 용을 넘어 그 힘까지 받아들여야 한다.",
+            objective
         );
     }
 
@@ -1208,6 +1226,40 @@ internal sealed class ModEntry : Mod
                 LogLevel.Trace
             );
         }
+    }
+
+    private void SetQuestProgressDescription(
+        string questId,
+        string baseDescription,
+        string objective
+    )
+    {
+        object? quest = FindQuestInJournal(questId);
+        if (quest is null)
+            return;
+
+        string progressDescription =
+            $"{baseDescription}\n\n{objective}";
+
+        // Different 1.6 builds expose the description under slightly
+        // different member names; update whichever exists.
+        TrySetStringLikeMember(
+            quest,
+            "questDescription",
+            progressDescription
+        );
+
+        TrySetStringLikeMember(
+            quest,
+            "_questDescription",
+            progressDescription
+        );
+
+        TrySetStringLikeMember(
+            quest,
+            "description",
+            progressDescription
+        );
     }
 
     private static string? ReadStringLikeValue(object? value)

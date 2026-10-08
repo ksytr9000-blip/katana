@@ -874,6 +874,36 @@ internal sealed class CombatService
                 hitAnything = true;
             }
 
+            // Mummies normally revive after being reduced to 0 HP unless
+            // finished by an explosion. "검술의 극" bypasses that rule:
+            // after the critical slash, apply a vanilla bomb-type finisher
+            // twice if needed so the mummy is permanently killed while
+            // preserving the game's normal death/drop handling.
+            if (monster is Mummy
+                && Game1.currentLocation.characters.Contains(monster))
+            {
+                Rectangle mummyBox = monster.GetBoundingBox();
+
+                for (int finishPass = 0; finishPass < 2; finishPass++)
+                {
+                    if (!Game1.currentLocation.characters.Contains(monster))
+                        break;
+
+                    Game1.currentLocation.damageMonster(
+                        mummyBox,
+                        99999,
+                        99999,
+                        isBomb: true,
+                        knockBackModifier: 0f,
+                        addedPrecision: 0,
+                        critChance: 1f,
+                        critMultiplier: 2f,
+                        triggerMonsterInvincibleTimer: false,
+                        who: Game1.player
+                    );
+                }
+            }
+
             AddArcFx(
                 monsterCenter,
                 radius: Math.Max(34f, Math.Min(monsterBox.Width, monsterBox.Height) * 0.9f),
