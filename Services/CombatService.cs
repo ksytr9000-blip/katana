@@ -874,33 +874,54 @@ internal sealed class CombatService
                 hitAnything = true;
             }
 
-            // Mummies normally revive after being reduced to 0 HP unless
-            // finished by an explosion. "검술의 극" bypasses that rule:
-            // after the critical slash, apply a vanilla bomb-type finisher
-            // twice if needed so the mummy is permanently killed while
-            // preserving the game's normal death/drop handling.
-            if (monster is Mummy
+            // "검술의 극" can finish monsters which normally resist or ignore
+            // ordinary sword damage.
+            //
+            // - Mummy: normally revives unless finished by an explosion.
+            // - Armored Bug: normally ignores ordinary weapon damage.
+            // - Rock Crab: normally requires its shell/rock state to be broken first.
+            //
+            // Use a vanilla bomb-type 99,999 finisher so the game's normal
+            // death/drop handling is preserved as much as possible.
+            bool specialFinisherTarget =
+                monster is Mummy
+                || monster is ArmoredBug
+                || monster is RockCrab;
+
+            if (specialFinisherTarget
                 && Game1.currentLocation.characters.Contains(monster))
             {
-                Rectangle mummyBox = monster.GetBoundingBox();
+                Rectangle monsterBox = monster.GetBoundingBox();
 
-                for (int finishPass = 0; finishPass < 2; finishPass++)
+                // Multiple passes cover revive / armor / shell state transitions.
+                for (int finishPass = 0; finishPass < 3; finishPass++)
                 {
                     if (!Game1.currentLocation.characters.Contains(monster))
                         break;
 
-                    Game1.currentLocation.damageMonster(
-                        mummyBox,
-                        99999,
-                        99999,
-                        isBomb: true,
-                        knockBackModifier: 0f,
-                        addedPrecision: 0,
-                        critChance: 1f,
-                        critMultiplier: 2f,
-                        triggerMonsterInvincibleTimer: false,
-                        who: Game1.player
-                    );
+                    bool previousIgnoreLos = monster.ignoreDamageLOS.Value;
+
+                    try
+                    {
+                        monster.ignoreDamageLOS.Value = true;
+
+                        Game1.currentLocation.damageMonster(
+                            monsterBox,
+                            99999,
+                            99999,
+                            isBomb: true,
+                            knockBackModifier: 0f,
+                            addedPrecision: 999,
+                            critChance: 1f,
+                            critMultiplier: 2f,
+                            triggerMonsterInvincibleTimer: false,
+                            who: Game1.player
+                        );
+                    }
+                    finally
+                    {
+                        monster.ignoreDamageLOS.Value = previousIgnoreLos;
+                    }
                 }
             }
 
