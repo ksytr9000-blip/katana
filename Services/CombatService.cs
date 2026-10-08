@@ -512,8 +512,6 @@ internal sealed class CombatService
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         int facing = player.FacingDirection;
-        int weaponDamage = GetWeaponReferenceDamage();
-
         AnimateSwordSkill(player, 22f);
 
         Vector2 start = player.Position;
@@ -540,18 +538,14 @@ internal sealed class CombatService
 
         Rectangle path = BuildPathRectangle(start, end, width);
 
-        float multiplier = stage switch
-        {
-            1 => 2.15f,
-            2 => 2.55f,
-            _ => 3.00f
-        };
-
-        // Each invested point visibly increases the Ohgi's damage.
-        multiplier += progress.TotalPoints * 0.025f;
-
-        int damage = ScaleDamage(weaponDamage, multiplier);
-        DamageArea(location, path, damage, 0.08f);
+        // Issen never scales its damage.
+        // It is a true finishing technique: exact 99,999 damage and guaranteed critical.
+        DamageAreaForcedCritical(
+            location,
+            path,
+            damage: 99999,
+            knockback: 0.08f
+        );
 
         AddIssenFx(start, end, facing, width, stage);
         location.localSound("swordswipe");
@@ -1028,8 +1022,9 @@ internal sealed class CombatService
     )
     {
         // Base single-hit skill = 130% of equipped sword average damage.
-        // Each invested SP adds +2 percentage points so upgrades are easy to feel.
-        return 1.30f + stageBonus + progress.TotalPoints * 0.02f;
+        // Each invested SP adds +4 percentage points.
+        // 0 SP = 130%, 5 SP = 150%, 10 SP = 170%, 15 SP = 190%.
+        return 1.30f + stageBonus + progress.TotalPoints * 0.04f;
     }
 
     private static float MultiHitMultiplier(
@@ -1038,8 +1033,9 @@ internal sealed class CombatService
     )
     {
         // Base multi-hit skill = 75% PER HIT.
-        // Each invested SP adds +1.5 percentage points per hit.
-        return 0.75f + stageBonus + progress.TotalPoints * 0.015f;
+        // Each invested SP adds +2.5 percentage points per hit.
+        // 0 SP = 75%, 5 SP = 87.5%, 10 SP = 100%, 15 SP = 112.5%.
+        return 0.75f + stageBonus + progress.TotalPoints * 0.025f;
     }
 
     private static int ScaleDamage(int weaponReferenceDamage, float multiplier)
@@ -1155,6 +1151,28 @@ internal sealed class CombatService
             knockBackModifier: knockback,
             addedPrecision: 0,
             critChance: 0f,
+            critMultiplier: 1f,
+            triggerMonsterInvincibleTimer: false,
+            who: Game1.player
+        );
+    }
+
+    private static void DamageAreaForcedCritical(
+        GameLocation location,
+        Rectangle area,
+        int damage,
+        float knockback
+    )
+    {
+        location.damageMonster(
+            area,
+            damage,
+            damage,
+            isBomb: false,
+            knockBackModifier: knockback,
+            addedPrecision: 0,
+            critChance: 1f,
+            // Keep crit multiplier at 1 so the final visible damage remains exactly 99,999.
             critMultiplier: 1f,
             triggerMonsterInvincibleTimer: false,
             who: Game1.player
