@@ -14,6 +14,11 @@ internal sealed class ModConfig
     public SButton BasicSkillBKey { get; set; } = SButton.F7;
     public SButton BasicSkillCKey { get; set; } = SButton.F8;
 
+    // Selected branch activation keys.
+    // Ohgi B and Ultimate A are passive, so these keys are used by the active branches.
+    public SButton OhgiSkillKey { get; set; } = SButton.F9;
+    public SButton UltimateSkillKey { get; set; } = SButton.F10;
+
     public int MaxSwordLevel { get; set; } = 75;
     public int ExpPerMonsterKill { get; set; } = 10;
 

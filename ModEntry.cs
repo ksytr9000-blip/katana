@@ -115,6 +115,29 @@ internal sealed class ModEntry : Mod
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
+            text: () => "오의 / 극의 단축키"
+        );
+
+        gmcm.AddKeybind(
+            mod: ModManifest,
+            getValue: () => Config.OhgiSkillKey,
+            setValue: value => Config.OhgiSkillKey = value,
+            name: () => "오의 발동 키",
+            tooltip: () => "일섬/검술의 정점 발동용입니다. 검기 오의는 기본 검 공격에 자동 발동됩니다.",
+            fieldId: "OhgiSkillKey"
+        );
+
+        gmcm.AddKeybind(
+            mod: ModManifest,
+            getValue: () => Config.UltimateSkillKey,
+            setValue: value => Config.UltimateSkillKey = value,
+            name: () => "극의 발동 키",
+            tooltip: () => "보법의 극 발동용입니다. 검술의 극은 상시 자동 발동됩니다.",
+            fieldId: "UltimateSkillKey"
+        );
+
+        gmcm.AddSectionTitle(
+            mod: ModManifest,
             text: () => "HUD 설정"
         );
 
@@ -282,6 +305,10 @@ internal sealed class ModEntry : Mod
         if (Game1.activeClickableMenu is not null || !Context.IsPlayerFree)
             return;
 
+        // Ohgi B "검기" is passive: normal sword attacks launch the wave.
+        if (e.Button == SButton.MouseLeft || e.Button == SButton.C || e.Button == SButton.ControllerX)
+            Combat.OnVanillaSwordAttack(Data);
+
         string? branch = null;
 
         if (e.Button == Config.BasicSkillAKey)
@@ -291,17 +318,47 @@ internal sealed class ModEntry : Mod
         else if (e.Button == Config.BasicSkillCKey)
             branch = "C";
 
-        if (branch is null)
-            return;
+        if (branch is not null)
+        {
+            if (Combat.TryUseBasicSkill(branch, Data, out string basicMessage))
+            {
+                Helper.Input.Suppress(e.Button);
+            }
+            else if (!string.IsNullOrWhiteSpace(basicMessage))
+            {
+                Game1.addHUDMessage(new HUDMessage(basicMessage));
+                Game1.playSound("cancel");
+            }
 
-        if (Combat.TryUseBasicSkill(branch, Data, out string message))
-        {
-            Helper.Input.Suppress(e.Button);
+            return;
         }
-        else if (!string.IsNullOrWhiteSpace(message))
+
+        if (e.Button == Config.OhgiSkillKey)
         {
-            Game1.addHUDMessage(new HUDMessage(message));
-            Game1.playSound("cancel");
+            if (Combat.TryUseOhgi(Data, out string ohgiMessage))
+            {
+                Helper.Input.Suppress(e.Button);
+            }
+            else if (!string.IsNullOrWhiteSpace(ohgiMessage))
+            {
+                Game1.addHUDMessage(new HUDMessage(ohgiMessage));
+                Game1.playSound("cancel");
+            }
+
+            return;
+        }
+
+        if (e.Button == Config.UltimateSkillKey)
+        {
+            if (Combat.TryUseUltimate(Data, out string ultimateMessage))
+            {
+                Helper.Input.Suppress(e.Button);
+            }
+            else if (!string.IsNullOrWhiteSpace(ultimateMessage))
+            {
+                Game1.addHUDMessage(new HUDMessage(ultimateMessage));
+                Game1.playSound("cancel");
+            }
         }
     }
 
@@ -343,7 +400,7 @@ internal sealed class ModEntry : Mod
         if (!Context.IsWorldReady)
             return;
 
-        Combat.Update();
+        Combat.Update(Data);
 
         if (!e.IsMultipleOf(15))
             return;

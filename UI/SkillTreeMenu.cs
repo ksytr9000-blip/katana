@@ -36,20 +36,6 @@ internal sealed class SkillTreeMenu : IClickableMenu
         ["UltimateB"] = "보법의 극"
     };
 
-    private readonly Dictionary<string, string> SkillTypes = new()
-    {
-        ["BasicA"] = "기초검술 A",
-        ["BasicB"] = "기초검술 B",
-        ["BasicC"] = "기초검술 C",
-
-        ["OhgiA"] = "오의 A",
-        ["OhgiB"] = "오의 B",
-        ["OhgiC"] = "오의 C",
-
-        ["UltimateA"] = "극의 A",
-        ["UltimateB"] = "극의 B"
-    };
-
     private readonly Dictionary<string, string[]> SkillDescriptions = new()
     {
         ["BasicA"] = new[]
@@ -668,18 +654,17 @@ internal sealed class SkillTreeMenu : IClickableMenu
     private void DrawTooltip(SpriteBatch b, string id)
     {
         string title = SkillNames[id];
-        string type = SkillTypes[id];
         string[] lines = SkillDescriptions[id];
         string state = GetStateText(id);
 
-        int tooltipWidth = 470;
-        int tooltipHeight = 174 + lines.Length * 32;
+        int tooltipWidth = 410;
+        int tooltipHeight = 132 + lines.Length * 25;
 
-        int x = HoverX + 28;
-        int y = HoverY + 26;
+        int x = HoverX + 24;
+        int y = HoverY + 22;
 
         if (x + tooltipWidth > Game1.uiViewport.Width - 16)
-            x = HoverX - tooltipWidth - 24;
+            x = HoverX - tooltipWidth - 20;
 
         if (y + tooltipHeight > Game1.uiViewport.Height - 16)
             y = Game1.uiViewport.Height - tooltipHeight - 16;
@@ -696,10 +681,10 @@ internal sealed class SkillTreeMenu : IClickableMenu
             Color.White
         );
 
-        Rectangle inner = new(x + 12, y + 12, tooltipWidth - 24, tooltipHeight - 24);
-        b.Draw(Game1.staminaRect, inner, new Color(74, 42, 27) * 0.96f);
+        Rectangle inner = new(x + 10, y + 10, tooltipWidth - 20, tooltipHeight - 20);
+        b.Draw(Game1.staminaRect, inner, new Color(70, 40, 26) * 0.96f);
 
-        Rectangle iconFrame = new(x + 22, y + 22, 82, 82);
+        Rectangle iconFrame = new(x + 18, y + 18, 68, 68);
         IClickableMenu.drawTextureBox(
             b,
             iconFrame.X,
@@ -709,61 +694,54 @@ internal sealed class SkillTreeMenu : IClickableMenu
             new Color(255, 220, 145)
         );
 
-        Rectangle icon = new(iconFrame.X + 7, iconFrame.Y + 7, 68, 68);
+        Rectangle icon = new(iconFrame.X + 6, iconFrame.Y + 6, 56, 56);
         b.Draw(
             Icons[id],
             icon,
             IsLocked(id, GetGroup(id)) ? Color.White * 0.35f : Color.White
         );
 
+        // 기술명만 표시. "기초검술 A/B/C" 같은 분류 문구는 표시하지 않음.
         Utility.drawTextWithShadow(
             b,
             title,
-            Game1.dialogueFont,
-            new Vector2(x + 122, y + 24),
+            Game1.smallFont,
+            new Vector2(x + 104, y + 28),
             new Color(255, 205, 92)
         );
 
-        Utility.drawTextWithShadow(
-            b,
-            type,
-            Game1.smallFont,
-            new Vector2(x + 124, y + 70),
-            new Color(221, 189, 145)
-        );
-
-        Rectangle divider = new(x + 22, y + 116, tooltipWidth - 44, 2);
+        Rectangle divider = new(x + 18, y + 98, tooltipWidth - 36, 2);
         b.Draw(Game1.staminaRect, divider, new Color(183, 123, 63) * 0.8f);
 
-        int lineY = y + 136;
+        int lineY = y + 112;
         foreach (string line in lines)
         {
             Utility.drawTextWithShadow(
                 b,
                 line,
-                Game1.smallFont,
-                new Vector2(x + 28, lineY),
+                Game1.tinyFont,
+                new Vector2(x + 22, lineY),
                 Color.White
             );
-            lineY += 32;
+            lineY += 25;
         }
 
-        Rectangle footer = new(x + 22, y + tooltipHeight - 66, tooltipWidth - 44, 2);
+        Rectangle footer = new(x + 18, y + tooltipHeight - 49, tooltipWidth - 36, 2);
         b.Draw(Game1.staminaRect, footer, new Color(183, 123, 63) * 0.65f);
 
         Utility.drawTextWithShadow(
             b,
-            $"현재 투자: {Data.Skills[id].TotalPoints} / 15",
-            Game1.smallFont,
-            new Vector2(x + 28, y + tooltipHeight - 54),
+            $"투자 {Data.Skills[id].TotalPoints}/15",
+            Game1.tinyFont,
+            new Vector2(x + 22, y + tooltipHeight - 37),
             new Color(255, 205, 92)
         );
 
         Utility.drawTextWithShadow(
             b,
             state,
-            Game1.smallFont,
-            new Vector2(x + 230, y + tooltipHeight - 54),
+            Game1.tinyFont,
+            new Vector2(x + 150, y + tooltipHeight - 37),
             GetStateColor(id)
         );
     }
