@@ -9,6 +9,11 @@ internal sealed class ModConfig
     public int HudY { get; set; } = 24;
     public SButton OpenMenuKey { get; set; } = SButton.K;
 
+    // Combat skill hotkeys (PC test defaults; configurable through GMCM).
+    public SButton BasicSkillAKey { get; set; } = SButton.F6;
+    public SButton BasicSkillBKey { get; set; } = SButton.F7;
+    public SButton BasicSkillCKey { get; set; } = SButton.F8;
+
     public int MaxSwordLevel { get; set; } = 75;
     public int ExpPerMonsterKill { get; set; } = 10;
 

@@ -18,12 +18,14 @@ internal sealed class ModEntry : Mod
     private SaveData Data = new();
     private ProgressionService Progression = null!;
     private SkillService Skills = null!;
+    private CombatService Combat = null!;
 
     public override void Entry(IModHelper helper)
     {
         Config = helper.ReadConfig<ModConfig>();
         Progression = new ProgressionService(Config);
         Skills = new SkillService();
+        Combat = new CombatService(Monitor);
 
         helper.Events.GameLoop.GameLaunched += OnGameLaunched;
         helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
@@ -31,6 +33,7 @@ internal sealed class ModEntry : Mod
         helper.Events.GameLoop.DayStarted += OnDayStarted;
         helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
         helper.Events.Display.RenderedHud += OnRenderedHud;
+        helper.Events.Display.RenderedWorld += OnRenderedWorld;
         helper.Events.Input.ButtonPressed += OnButtonPressed;
 
         helper.ConsoleCommands.Add("sm_status", "Show Sword Mastery status.", CommandStatus);
@@ -80,6 +83,38 @@ internal sealed class ModEntry : Mod
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
+            text: () => "기초검술 단축키"
+        );
+
+        gmcm.AddKeybind(
+            mod: ModManifest,
+            getValue: () => Config.BasicSkillAKey,
+            setValue: value => Config.BasicSkillAKey = value,
+            name: () => "검사의 발걸음",
+            tooltip: () => "기초검술 A: 전방 대쉬 계열 기술입니다.",
+            fieldId: "BasicSkillAKey"
+        );
+
+        gmcm.AddKeybind(
+            mod: ModManifest,
+            getValue: () => Config.BasicSkillBKey,
+            setValue: value => Config.BasicSkillBKey = value,
+            name: () => "참격",
+            tooltip: () => "기초검술 B: 전방 베기 / 검기 계열 기술입니다.",
+            fieldId: "BasicSkillBKey"
+        );
+
+        gmcm.AddKeybind(
+            mod: ModManifest,
+            getValue: () => Config.BasicSkillCKey,
+            setValue: value => Config.BasicSkillCKey = value,
+            name: () => "칼리코류 검술",
+            tooltip: () => "기초검술 C: 다단 검격 계열 기술입니다.",
+            fieldId: "BasicSkillCKey"
+        );
+
+        gmcm.AddSectionTitle(
+            mod: ModManifest,
             text: () => "HUD 설정"
         );
 
@@ -118,7 +153,106 @@ internal sealed class ModEntry : Mod
             fieldId: "HudY"
         );
 
+        gmcm.AddPageLink(
+            mod: ModManifest,
+            pageId: "debug",
+            text: () => "DEBUG 테스트 도구",
+            tooltip: () => "개발/테스트용 수치를 직접 변경합니다."
+        );
+
+        gmcm.AddPage(
+            mod: ModManifest,
+            pageId: "debug",
+            pageTitle: () => "Sword Mastery DEBUG"
+        );
+
+        gmcm.AddParagraph(
+            mod: ModManifest,
+            text: () => "※ 세이브를 불러온 상태에서만 적용됩니다. 테스트용 설정입니다."
+        );
+
+        gmcm.AddNumberOption(
+            mod: ModManifest,
+            getValue: () => Context.IsWorldReady ? Data.SwordLevel : 0,
+            setValue: value => ApplyDebugSwordLevel(value),
+            name: () => "검술 레벨",
+            tooltip: () => "검술 레벨을 즉시 변경합니다. 변경 시 현재 EXP는 0이 되고, 투자된 SP를 제외한 만큼 남은 SP를 자동 계산합니다.",
+            min: 0,
+            max: Config.MaxSwordLevel,
+            interval: 1,
+            fieldId: "DebugSwordLevel"
+        );
+
+        gmcm.AddNumberOption(
+            mod: ModManifest,
+            getValue: () => Context.IsWorldReady ? Data.UnspentSkillPoints : 0,
+            setValue: value =>
+            {
+                if (Context.IsWorldReady)
+                    Data.UnspentSkillPoints = Math.Max(0, value);
+            },
+            name: () => "남은 SP",
+            tooltip: () => "테스트를 위해 남은 스킬 포인트를 직접 설정합니다.",
+            min: 0,
+            max: 200,
+            interval: 1,
+            fieldId: "DebugSkillPoints"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => Context.IsWorldReady && Data.OhgiAccessGranted,
+            setValue: value =>
+            {
+                if (!Context.IsWorldReady)
+                    return;
+
+                Data.OhgiAccessGranted = value;
+                Data.OhgiQuestAvailable = false;
+
+                if (!value)
+                    Data.SelectedOhgi = null;
+            },
+            name: () => "오의 강제 해방",
+            tooltip: () => "오의 선택/강화 UI 테스트용입니다. 끄면 선택한 오의 분기도 해제됩니다.",
+            fieldId: "DebugOhgiAccess"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => Context.IsWorldReady && Data.UltimateAccessGranted,
+            setValue: value =>
+            {
+                if (!Context.IsWorldReady)
+                    return;
+
+                Data.UltimateAccessGranted = value;
+                Data.UltimateQuestAvailable = false;
+
+                if (!value)
+                    Data.SelectedUltimate = null;
+            },
+            name: () => "극의 강제 해방",
+            tooltip: () => "극의 선택/강화 UI 테스트용입니다. 끄면 선택한 극의 분기도 해제됩니다.",
+            fieldId: "DebugUltimateAccess"
+        );
+
         Monitor.Log("Generic Mod Config Menu integration registered.", LogLevel.Info);
+    }
+
+    private void ApplyDebugSwordLevel(int value)
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        int level = Math.Clamp(value, 0, Config.MaxSwordLevel);
+        int spentPoints = Data.Skills.Values.Sum(skill => skill.TotalPoints);
+
+        Data.SwordLevel = level;
+        Data.SwordExperience = 0;
+        Data.UnspentSkillPoints = Math.Max(0, level - spentPoints);
+
+        RefreshUnlockState(showMessages: false);
     }
 
     private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
@@ -126,21 +260,49 @@ internal sealed class ModEntry : Mod
         if (!Context.IsWorldReady)
             return;
 
-        if (e.Button != Config.OpenMenuKey)
-            return;
-
-        if (Game1.activeClickableMenu is SkillTreeMenu)
+        // Sword Mastery menu.
+        if (e.Button == Config.OpenMenuKey)
         {
-            Game1.exitActiveMenu();
+            if (Game1.activeClickableMenu is SkillTreeMenu)
+            {
+                Game1.exitActiveMenu();
+                return;
+            }
+
+            if (Game1.activeClickableMenu is not null)
+                return;
+
+            RefreshUnlockState(showMessages: false);
+            Game1.activeClickableMenu = new SkillTreeMenu(Data, Config, Progression, Skills, Helper);
+            Game1.playSound("bigSelect");
             return;
         }
 
-        if (Game1.activeClickableMenu is not null)
+        // Don't fire combat skills while another menu/cutscene/input lock is active.
+        if (Game1.activeClickableMenu is not null || !Context.IsPlayerFree)
             return;
 
-        RefreshUnlockState(showMessages: false);
-        Game1.activeClickableMenu = new SkillTreeMenu(Data, Config, Progression, Skills, Helper);
-        Game1.playSound("bigSelect");
+        string? branch = null;
+
+        if (e.Button == Config.BasicSkillAKey)
+            branch = "A";
+        else if (e.Button == Config.BasicSkillBKey)
+            branch = "B";
+        else if (e.Button == Config.BasicSkillCKey)
+            branch = "C";
+
+        if (branch is null)
+            return;
+
+        if (Combat.TryUseBasicSkill(branch, Data, out string message))
+        {
+            Helper.Input.Suppress(e.Button);
+        }
+        else if (!string.IsNullOrWhiteSpace(message))
+        {
+            Game1.addHUDMessage(new HUDMessage(message));
+            Game1.playSound("cancel");
+        }
     }
 
     private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
@@ -178,7 +340,12 @@ internal sealed class ModEntry : Mod
 
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
-        if (!Context.IsWorldReady || !e.IsMultipleOf(15))
+        if (!Context.IsWorldReady)
+            return;
+
+        Combat.Update();
+
+        if (!e.IsMultipleOf(15))
             return;
 
         int currentKills = Convert.ToInt32(Game1.player.stats.MonstersKilled);
@@ -245,6 +412,14 @@ internal sealed class ModEntry : Mod
 
         if (!prevUltimateAccess && Data.UltimateAccessGranted)
             Game1.addHUDMessage(new HUDMessage("극의가 해방되었습니다.", HUDMessage.newQuest_type));
+    }
+
+    private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        Combat.Draw(e.SpriteBatch);
     }
 
     private void OnRenderedHud(object? sender, RenderedHudEventArgs e)

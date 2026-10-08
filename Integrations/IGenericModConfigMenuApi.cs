@@ -21,6 +21,11 @@ public interface IGenericModConfigMenuApi
         Func<string>? tooltip = null
     );
 
+    void AddParagraph(
+        IManifest mod,
+        Func<string> text
+    );
+
     void AddBoolOption(
         IManifest mod,
         Func<bool> getValue,
@@ -50,5 +55,18 @@ public interface IGenericModConfigMenuApi
         Func<string> name,
         Func<string>? tooltip = null,
         string? fieldId = null
+    );
+
+    void AddPage(
+        IManifest mod,
+        string pageId,
+        Func<string>? pageTitle = null
+    );
+
+    void AddPageLink(
+        IManifest mod,
+        string pageId,
+        Func<string> text,
+        Func<string>? tooltip = null
     );
 }
