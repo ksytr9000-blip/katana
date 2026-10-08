@@ -19,6 +19,7 @@ internal sealed class ModEntry : Mod
     private ProgressionService Progression = null!;
     private SkillService Skills = null!;
     private CombatService Combat = null!;
+    private readonly Dictionary<string, Texture2D> CooldownIcons = new();
 
     public override void Entry(IModHelper helper)
     {
@@ -26,6 +27,7 @@ internal sealed class ModEntry : Mod
         Progression = new ProgressionService(Config);
         Skills = new SkillService();
         Combat = new CombatService(Monitor);
+        LoadCooldownIcons();
 
         helper.Events.GameLoop.GameLaunched += OnGameLaunched;
         helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
@@ -174,6 +176,46 @@ internal sealed class ModEntry : Mod
             interval: 8,
             formatValue: value => $"{value}px",
             fieldId: "HudY"
+        );
+
+        gmcm.AddSectionTitle(
+            mod: ModManifest,
+            text: () => "쿨다운 HUD"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => Config.ShowCooldownHud,
+            setValue: value => Config.ShowCooldownHud = value,
+            name: () => "쿨다운 HUD 표시",
+            tooltip: () => "기초검술과 선택한 액티브 오의의 쿨다운 아이콘을 표시합니다.",
+            fieldId: "ShowCooldownHud"
+        );
+
+        gmcm.AddNumberOption(
+            mod: ModManifest,
+            getValue: () => Config.CooldownHudX,
+            setValue: value => Config.CooldownHudX = value,
+            name: () => "쿨다운 HUD X 위치",
+            tooltip: () => "쿨다운 아이콘 HUD의 가로 위치를 조절합니다.",
+            min: 0,
+            max: 4000,
+            interval: 8,
+            formatValue: value => $"{value}px",
+            fieldId: "CooldownHudX"
+        );
+
+        gmcm.AddNumberOption(
+            mod: ModManifest,
+            getValue: () => Config.CooldownHudY,
+            setValue: value => Config.CooldownHudY = value,
+            name: () => "쿨다운 HUD Y 위치",
+            tooltip: () => "쿨다운 아이콘 HUD의 세로 위치를 조절합니다.",
+            min: 0,
+            max: 2400,
+            interval: 8,
+            formatValue: value => $"{value}px",
+            fieldId: "CooldownHudY"
         );
 
         gmcm.AddPageLink(
@@ -479,12 +521,31 @@ internal sealed class ModEntry : Mod
         Combat.Draw(e.SpriteBatch);
     }
 
+    private void LoadCooldownIcons()
+    {
+        CooldownIcons["BasicA"] = Helper.ModContent.Load<Texture2D>("assets/icons/basic_a.png");
+        CooldownIcons["BasicB"] = Helper.ModContent.Load<Texture2D>("assets/icons/basic_b.png");
+        CooldownIcons["BasicC"] = Helper.ModContent.Load<Texture2D>("assets/icons/basic_c.png");
+        CooldownIcons["OhgiA"] = Helper.ModContent.Load<Texture2D>("assets/icons/ohgi_a.png");
+        CooldownIcons["OhgiC"] = Helper.ModContent.Load<Texture2D>("assets/icons/ohgi_c.png");
+    }
+
     private void OnRenderedHud(object? sender, RenderedHudEventArgs e)
     {
-        if (!Config.ShowHud || !Context.IsWorldReady || Game1.activeClickableMenu is not null)
+        if (!Context.IsWorldReady || Game1.activeClickableMenu is not null)
             return;
 
+        if (Config.ShowHud)
+            DrawProgressHud(e.SpriteBatch);
+
+        if (Config.ShowCooldownHud)
+            DrawCooldownHud(e.SpriteBatch);
+    }
+
+    private void DrawProgressHud(SpriteBatch b)
+    {
         string text;
+
         if (Data.SwordLevel >= Config.MaxSwordLevel)
         {
             text = $"검술 Lv.{Data.SwordLevel}  MASTER  SP:{Data.UnspentSkillPoints}";
@@ -499,13 +560,110 @@ internal sealed class ModEntry : Mod
         float hudY = Math.Clamp(Config.HudY, 0, Math.Max(0, Game1.uiViewport.Height - 80));
 
         Vector2 pos = new(hudX, hudY);
-        e.SpriteBatch.DrawString(Game1.smallFont, text, pos + new Vector2(2f, 2f), Color.Black * 0.7f);
-        e.SpriteBatch.DrawString(Game1.smallFont, text, pos, Color.White);
+
+        b.DrawString(
+            Game1.smallFont,
+            text,
+            pos + new Vector2(2f, 2f),
+            Color.Black * 0.7f
+        );
+        b.DrawString(Game1.smallFont, text, pos, Color.White);
 
         string prompt = $"[{Config.OpenMenuKey}] 검술창";
         Vector2 promptPos = new(hudX, hudY + 28f);
-        e.SpriteBatch.DrawString(Game1.smallFont, prompt, promptPos + new Vector2(2f, 2f), Color.Black * 0.7f);
-        e.SpriteBatch.DrawString(Game1.smallFont, prompt, promptPos, Color.White);
+
+        b.DrawString(
+            Game1.smallFont,
+            prompt,
+            promptPos + new Vector2(2f, 2f),
+            Color.Black * 0.7f
+        );
+        b.DrawString(Game1.smallFont, prompt, promptPos, Color.White);
+    }
+
+    private void DrawCooldownHud(SpriteBatch b)
+    {
+        IReadOnlyList<CooldownStatus> statuses = Combat.GetCooldownStatuses(Data);
+
+        if (statuses.Count == 0)
+            return;
+
+        const int iconSize = 46;
+        const int gap = 8;
+
+        int totalWidth = statuses.Count * iconSize + Math.Max(0, statuses.Count - 1) * gap;
+        float baseX = Math.Clamp(
+            Config.CooldownHudX,
+            0,
+            Math.Max(0, Game1.uiViewport.Width - totalWidth)
+        );
+        float baseY = Math.Clamp(
+            Config.CooldownHudY,
+            0,
+            Math.Max(0, Game1.uiViewport.Height - iconSize - 4)
+        );
+
+        for (int i = 0; i < statuses.Count; i++)
+        {
+            CooldownStatus status = statuses[i];
+
+            if (!CooldownIcons.TryGetValue(status.SkillId, out Texture2D? icon))
+                continue;
+
+            int x = (int)baseX + i * (iconSize + gap);
+            int y = (int)baseY;
+
+            Rectangle border = new(x - 2, y - 2, iconSize + 4, iconSize + 4);
+            b.Draw(Game1.staminaRect, border, new Color(77, 45, 25) * 0.90f);
+
+            Rectangle iconRect = new(x, y, iconSize, iconSize);
+            Color iconColor = status.Available ? Color.White : Color.White * 0.28f;
+            b.Draw(icon, iconRect, iconColor);
+
+            if (!status.Available)
+            {
+                b.Draw(Game1.staminaRect, iconRect, Color.Black * 0.48f);
+                continue;
+            }
+
+            if (status.RemainingTicks <= 0 || status.MaxTicks <= 0)
+            {
+                Rectangle readyBorder = new(x, y, iconSize, 3);
+                b.Draw(Game1.staminaRect, readyBorder, new Color(255, 210, 70) * 0.95f);
+                continue;
+            }
+
+            float ratio = Math.Clamp(
+                status.RemainingTicks / (float)status.MaxTicks,
+                0f,
+                1f
+            );
+
+            int overlayHeight = (int)Math.Ceiling(iconSize * ratio);
+            Rectangle overlay = new(
+                x,
+                y,
+                iconSize,
+                overlayHeight
+            );
+
+            b.Draw(Game1.staminaRect, overlay, Color.Black * 0.62f);
+
+            string seconds = (status.RemainingTicks / 60f).ToString("0.0");
+            Vector2 textSize = Game1.tinyFont.MeasureString(seconds);
+            Vector2 textPos = new(
+                x + (iconSize - textSize.X) / 2f,
+                y + (iconSize - textSize.Y) / 2f
+            );
+
+            b.DrawString(
+                Game1.tinyFont,
+                seconds,
+                textPos + new Vector2(1f, 1f),
+                Color.Black
+            );
+            b.DrawString(Game1.tinyFont, seconds, textPos, Color.White);
+        }
     }
 
     private void CommandStatus(string command, string[] args)

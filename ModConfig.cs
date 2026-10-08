@@ -7,6 +7,10 @@ internal sealed class ModConfig
     public bool ShowHud { get; set; } = true;
     public int HudX { get; set; } = 24;
     public int HudY { get; set; } = 24;
+
+    public bool ShowCooldownHud { get; set; } = true;
+    public int CooldownHudX { get; set; } = 24;
+    public int CooldownHudY { get; set; } = 88;
     public SButton OpenMenuKey { get; set; } = SButton.K;
 
     // Combat skill hotkeys (PC test defaults; configurable through GMCM).

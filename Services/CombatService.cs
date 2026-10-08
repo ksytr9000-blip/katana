@@ -2,17 +2,31 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.Monsters;
 using StardewValley.Tools;
 using SwordMastery.Models;
 
 namespace SwordMastery.Services;
 
+internal readonly record struct CooldownStatus(
+    string SkillId,
+    int RemainingTicks,
+    int MaxTicks,
+    bool Available
+);
+
 /// <summary>
 /// Sword Mastery combat runtime.
-/// Input-agnostic so PC hotkeys and future Android touch controls can share the same combat methods.
+/// PC hotkeys and future Android touch buttons call the same methods.
 /// </summary>
 internal sealed class CombatService
 {
+    private const int CooldownA = 420;       // 7.0 sec
+    private const int CooldownB = 180;       // 3.0 sec
+    private const int CooldownC = 300;       // 5.0 sec
+    private const int CooldownIssen = 720;   // 12.0 sec
+    private const int CooldownPinnacle = 570; // 9.5 sec
+
     private readonly Dictionary<string, int> Cooldowns = new()
     {
         ["A"] = 0,
@@ -23,20 +37,51 @@ internal sealed class CombatService
 
     private readonly List<PendingHit> PendingHits = new();
     private readonly List<SwordWave> Projectiles = new();
-    private readonly List<SlashFx> Effects = new();
+    private readonly List<ArcFx> ArcEffects = new();
 
     private int UltimateAuraTick;
 
     public CombatService(IMonitor monitor)
     {
-        // Monitor kept in constructor for future combat debug logging.
+        // Reserved for later combat debug logging.
+    }
+
+    public IReadOnlyList<CooldownStatus> GetCooldownStatuses(SaveData data)
+    {
+        List<CooldownStatus> result = new()
+        {
+            new("BasicA", Cooldowns["A"], CooldownA, data.Skills["BasicA"].TotalPoints > 0),
+            new("BasicB", Cooldowns["B"], CooldownB, data.Skills["BasicB"].TotalPoints > 0),
+            new("BasicC", Cooldowns["C"], CooldownC, data.Skills["BasicC"].TotalPoints > 0)
+        };
+
+        if (data.OhgiAccessGranted && data.SelectedOhgi == "A")
+        {
+            result.Add(new(
+                "OhgiA",
+                Cooldowns["OHGI"],
+                CooldownIssen,
+                data.Skills["OhgiA"].TotalPoints > 0
+            ));
+        }
+        else if (data.OhgiAccessGranted && data.SelectedOhgi == "C")
+        {
+            result.Add(new(
+                "OhgiC",
+                Cooldowns["OHGI"],
+                CooldownPinnacle,
+                data.Skills["OhgiC"].TotalPoints > 0
+            ));
+        }
+
+        return result;
     }
 
     public bool TryUseBasicSkill(string branch, SaveData data, out string message)
     {
         branch = branch.ToUpperInvariant();
 
-        if (!HasSwordEquipped())
+        if (!TryGetEquippedSword(out _))
         {
             message = "검을 장비해야 사용할 수 있습니다.";
             return false;
@@ -58,7 +103,7 @@ internal sealed class CombatService
 
         if (Cooldowns.TryGetValue(branch, out int cooldown) && cooldown > 0)
         {
-            message = $"재사용 대기 중입니다. ({Math.Max(1, cooldown / 6) / 10f:0.0}초)";
+            message = $"재사용 대기 {cooldown / 60f:0.0}초";
             return false;
         }
 
@@ -104,7 +149,7 @@ internal sealed class CombatService
             return false;
         }
 
-        if (!HasSwordEquipped())
+        if (!TryGetEquippedSword(out _))
         {
             message = "검을 장비해야 사용할 수 있습니다.";
             return false;
@@ -112,7 +157,7 @@ internal sealed class CombatService
 
         if (Cooldowns["OHGI"] > 0)
         {
-            message = $"오의 재사용 대기 중입니다. ({Math.Max(1, Cooldowns["OHGI"] / 6) / 10f:0.0}초)";
+            message = $"오의 재사용 대기 {Cooldowns["OHGI"] / 60f:0.0}초";
             return false;
         }
 
@@ -157,25 +202,24 @@ internal sealed class CombatService
             return false;
         }
 
-        if (!HasSwordEquipped())
+        if (!TryGetEquippedSword(out _))
         {
             message = "검을 장비해야 사용할 수 있습니다.";
             return false;
         }
 
-        // 보법의 극은 의도적으로 쿨다운이 없다.
+        // 보법의 극은 컨셉대로 쿨다운 없음.
         UseUltimateFootwork(progress, stage);
         message = "";
         return true;
     }
 
     /// <summary>
-    /// Called alongside a vanilla sword swing.
-    /// Ohgi B (Sword Wave) automatically launches from normal sword attacks.
+    /// Ohgi B "검기": vanilla sword swing launches a crescent sword wave.
     /// </summary>
     public void OnVanillaSwordAttack(SaveData data)
     {
-        if (!HasSwordEquipped())
+        if (!TryGetEquippedSword(out _))
             return;
 
         if (!data.OhgiAccessGranted || data.SelectedOhgi != "B")
@@ -205,85 +249,111 @@ internal sealed class CombatService
 
     public void Draw(SpriteBatch b)
     {
-        foreach (SlashFx fx in Effects)
+        foreach (ArcFx fx in ArcEffects)
         {
             float alpha = Math.Clamp(fx.Ticks / (float)fx.MaxTicks, 0f, 1f);
-            Vector2 screenStart = WorldToScreen(fx.Start);
-            Vector2 screenEnd = WorldToScreen(fx.End);
+            Vector2 center = WorldToScreen(fx.Center);
 
-            DrawLine(
+            DrawArc(
                 b,
-                screenStart,
-                screenEnd,
+                center,
+                fx.Radius,
+                fx.CenterAngle,
+                fx.Sweep,
                 fx.Width,
-                new Color(90, 220, 255) * alpha
+                new Color(55, 185, 255) * alpha,
+                segments: 12
             );
 
-            DrawLine(
+            DrawArc(
                 b,
-                screenStart,
-                screenEnd,
-                Math.Max(2f, fx.Width * 0.35f),
-                Color.White * Math.Min(1f, alpha + 0.15f)
+                center,
+                fx.Radius - Math.Max(2f, fx.Width * 0.22f),
+                fx.CenterAngle,
+                fx.Sweep,
+                Math.Max(2f, fx.Width * 0.34f),
+                Color.White * Math.Min(1f, alpha + 0.15f),
+                segments: 12
             );
         }
 
         foreach (SwordWave wave in Projectiles)
         {
             Vector2 center = WorldToScreen(wave.Position);
-            float rotation = (float)Math.Atan2(wave.Direction.Y, wave.Direction.X);
+            float directionAngle = (float)Math.Atan2(wave.Direction.Y, wave.Direction.X);
 
-            b.Draw(
-                Game1.staminaRect,
+            // Curved crescent, not a laser/bar.
+            DrawArc(
+                b,
                 center,
-                sourceRectangle: null,
-                color: new Color(60, 195, 255) * 0.9f,
-                rotation: rotation,
-                origin: new Vector2(0.5f, 0.5f),
-                scale: new Vector2(wave.VisualLength, wave.VisualWidth),
-                effects: SpriteEffects.None,
-                layerDepth: 1f
+                wave.VisualRadius,
+                directionAngle + MathF.PI,
+                wave.VisualSweep,
+                wave.VisualWidth,
+                new Color(55, 195, 255) * 0.92f,
+                segments: 14
             );
 
-            b.Draw(
-                Game1.staminaRect,
+            DrawArc(
+                b,
                 center,
-                sourceRectangle: null,
-                color: Color.White * 0.9f,
-                rotation: rotation,
-                origin: new Vector2(0.5f, 0.5f),
-                scale: new Vector2(wave.VisualLength * 0.75f, Math.Max(3f, wave.VisualWidth * 0.30f)),
-                effects: SpriteEffects.None,
-                layerDepth: 1f
+                wave.VisualRadius - wave.VisualWidth * 0.28f,
+                directionAngle + MathF.PI,
+                wave.VisualSweep,
+                Math.Max(2.5f, wave.VisualWidth * 0.33f),
+                Color.White * 0.95f,
+                segments: 14
             );
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Basic skills
+    // ---------------------------------------------------------------------
 
     private bool UseSwordsmanStep(SkillProgress progress, int stage)
     {
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
-
-        Vector2 start = player.Position;
         int facing = player.FacingDirection;
 
-        DashForward(player, facing, 52);
+        AnimateSwordSkill(player, 28f);
 
+        Vector2 start = player.Position;
+
+        // Max movement distance by stage:
+        // 1 = 2 tiles, 2 = 3 tiles, 3 = 4 tiles.
+        float maxDistancePixels = stage switch
+        {
+            1 => 2f * 64f,
+            2 => 3f * 64f,
+            _ => 4f * 64f
+        };
+
+        DashForwardPixels(player, facing, maxDistancePixels);
         Vector2 end = player.Position;
-        Rectangle path = BuildPathRectangle(start, end, 56);
 
-        // Damage deliberately kept low so multi-hit skills can actually display all hits.
-        int total = progress.TotalPoints;
+        Rectangle path = BuildPathRectangle(start, end, 64);
+        int weaponDamage = GetWeaponReferenceDamage();
 
         if (stage == 2)
         {
-            int damage = 2 + total / 4;
-            DamageArea(location, path, damage, 0.08f);
-            AddPathFx(start, end, 13, 12);
+            // Single-hit baseline: 130% of equipped sword average damage.
+            int damage = ScaleDamage(
+                weaponDamage,
+                SingleHitMultiplier(progress)
+            );
+
+            DamageArea(location, path, damage, 0.06f);
+            AddDashSlashFx(start, end, facing, 2);
         }
         else if (stage >= 3)
         {
-            int perHit = 1 + total / 5;
+            // Multi-hit baseline: 75% PER HIT, with visible SP scaling.
+            int perHit = ScaleDamage(
+                weaponDamage,
+                MultiHitMultiplier(progress)
+            );
 
             QueueMultiHit(
                 location,
@@ -291,19 +361,21 @@ internal sealed class CombatService
                 perHit,
                 hitCount: 4,
                 tickGap: 8,
-                knockback: 0.02f,
-                facing: facing
+                knockback: 0.01f,
+                facing: facing,
+                effectCenter: new Vector2(path.Center.X, path.Center.Y),
+                effectRadius: 58f
             );
 
-            AddPathFx(start, end, 15, 18);
+            AddDashSlashFx(start, end, facing, 4);
         }
         else
         {
-            AddPathFx(start, end, 10, 8);
+            AddDashSlashFx(start, end, facing, 1);
         }
 
         location.localSound("swordswipe");
-        Cooldowns["A"] = 36;
+        Cooldowns["A"] = CooldownA;
         return true;
     }
 
@@ -312,46 +384,68 @@ internal sealed class CombatService
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         int facing = player.FacingDirection;
-        int total = progress.TotalPoints;
+        int weaponDamage = GetWeaponReferenceDamage();
+
+        AnimateSwordSkill(player, 36f);
 
         if (stage == 1)
         {
-            Rectangle area = BuildFrontArea(player, range: 92, width: 84);
-            DamageArea(location, area, 3 + total / 4, 0.18f);
-            AddAreaFlash(area, facing, 12);
+            Rectangle area = BuildFrontArea(player, range: 92, width: 92);
+            int damage = ScaleDamage(
+                weaponDamage,
+                SingleHitMultiplier(progress)
+            );
+
+            DamageArea(location, area, damage, 0.12f);
+            AddFrontSlashFx(area, facing, 0, 60f, 15);
         }
         else if (stage == 2)
         {
-            Rectangle area = BuildFrontArea(player, range: 150, width: 148);
-            DamageArea(location, area, 4 + total / 4, 0.20f);
-            AddAreaFlash(area, facing, 14);
+            Rectangle area = BuildFrontArea(player, range: 150, width: 170);
+            int damage = ScaleDamage(
+                weaponDamage,
+                SingleHitMultiplier(progress, 0.15f)
+            );
+
+            DamageArea(location, area, damage, 0.12f);
+            AddFrontSlashFx(area, facing, 1, 88f, 16);
         }
         else
         {
             Vector2 direction = DirectionVector(facing);
-            Vector2 origin = CenterOf(player.GetBoundingBox()) + direction * 42f;
+            Vector2 origin = CenterOf(player.GetBoundingBox()) + direction * 50f;
 
             Projectiles.Add(new SwordWave
             {
                 Location = location,
                 Position = origin,
                 Direction = direction,
-                Speed = 23f,
-                RemainingTicks = 30,
-                BaseDamage = 4 + total / 4,
-                HitboxRadius = 20,
+                Speed = 21f,
+                RemainingTicks = 34,
+                BaseDamage = ScaleDamage(
+                    weaponDamage,
+                    SingleHitMultiplier(progress, 0.25f)
+                ),
+                HitboxRadius = 25,
                 MaxHitEvents = 1,
                 DistanceFalloff = 0f,
                 PierceFalloff = 0f,
-                VisualLength = 72f,
-                VisualWidth = 15f
+                VisualRadius = 48f,
+                VisualWidth = 13f,
+                VisualSweep = 2.45f
             });
 
-            AddPathFx(origin - direction * 24f, origin + direction * 54f, 13, 10);
+            AddFrontSlashFx(
+                new Rectangle((int)origin.X - 55, (int)origin.Y - 55, 110, 110),
+                facing,
+                0,
+                52f,
+                11
+            );
         }
 
         location.localSound("swordswipe");
-        Cooldowns["B"] = 30;
+        Cooldowns["B"] = CooldownB;
         return true;
     }
 
@@ -360,27 +454,37 @@ internal sealed class CombatService
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         int facing = player.FacingDirection;
+        int weaponDamage = GetWeaponReferenceDamage();
+
+        AnimateSwordSkill(player, 27f);
 
         int hitCount;
         Rectangle area;
+        float stageBonus;
 
         if (stage == 1)
         {
             hitCount = 3;
-            area = BuildFrontArea(player, range: 105, width: 100);
+            area = BuildFrontArea(player, range: 108, width: 112);
+            stageBonus = 0f;
         }
         else if (stage == 2)
         {
             hitCount = 4;
-            area = BuildFrontArea(player, range: 140, width: 220);
+            area = BuildFrontArea(player, range: 145, width: 226);
+            stageBonus = 0.05f;
         }
         else
         {
             hitCount = 6;
-            area = BuildFrontArea(player, range: 168, width: 252);
+            area = BuildFrontArea(player, range: 174, width: 268);
+            stageBonus = 0.10f;
         }
 
-        int perHitDamage = 1 + progress.TotalPoints / 5;
+        int perHitDamage = ScaleDamage(
+            weaponDamage,
+            MultiHitMultiplier(progress, stageBonus)
+        );
 
         QueueMultiHit(
             location,
@@ -388,46 +492,70 @@ internal sealed class CombatService
             perHitDamage,
             hitCount,
             tickGap: 8,
-            knockback: 0.02f,
-            facing: facing
+            knockback: 0.01f,
+            facing: facing,
+            effectCenter: new Vector2(area.Center.X, area.Center.Y),
+            effectRadius: stage == 1 ? 58f : stage == 2 ? 82f : 102f
         );
 
-        AddAreaFlash(area, facing, 14);
         location.localSound("swordswipe");
-        Cooldowns["C"] = 54;
+        Cooldowns["C"] = CooldownC;
         return true;
     }
 
-    // -------------------------
+    // ---------------------------------------------------------------------
     // Ohgi
-    // -------------------------
+    // ---------------------------------------------------------------------
 
     private bool UseIssen(SkillProgress progress, int stage)
     {
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         int facing = player.FacingDirection;
+        int weaponDamage = GetWeaponReferenceDamage();
+
+        AnimateSwordSkill(player, 22f);
+
         Vector2 start = player.Position;
 
-        DashForward(player, facing, 86);
+        // Issen max movement range: 4 / 6 / 8 tiles.
+        float maxDistancePixels = stage switch
+        {
+            1 => 4f * 64f,
+            2 => 6f * 64f,
+            _ => 8f * 64f
+        };
 
+        DashForwardPixels(player, facing, maxDistancePixels);
         Vector2 end = player.Position;
 
+        // User-requested path width:
+        // stage 1 = 1 tile, stage 2 = 5 tiles, stage 3 = 10 tiles.
         int width = stage switch
         {
-            1 => 64,
-            2 => 104,
-            _ => 152
+            1 => 1 * 64,
+            2 => 5 * 64,
+            _ => 10 * 64
         };
 
         Rectangle path = BuildPathRectangle(start, end, width);
-        int damage = 6 + progress.TotalPoints / 3;
 
-        DamageArea(location, path, damage, 0.12f);
-        AddPathFx(start, end, 22 + stage * 4, 18);
+        float multiplier = stage switch
+        {
+            1 => 2.15f,
+            2 => 2.55f,
+            _ => 3.00f
+        };
 
+        // Each invested point visibly increases the Ohgi's damage.
+        multiplier += progress.TotalPoints * 0.025f;
+
+        int damage = ScaleDamage(weaponDamage, multiplier);
+        DamageArea(location, path, damage, 0.08f);
+
+        AddIssenFx(start, end, facing, width, stage);
         location.localSound("swordswipe");
-        Cooldowns["OHGI"] = 90;
+        Cooldowns["OHGI"] = CooldownIssen;
         return true;
     }
 
@@ -435,40 +563,43 @@ internal sealed class CombatService
     {
         Farmer player = Game1.player;
         Vector2 direction = DirectionVector(player.FacingDirection);
-        Vector2 origin = CenterOf(player.GetBoundingBox()) + direction * 44f;
+        Vector2 origin = CenterOf(player.GetBoundingBox()) + direction * 50f;
 
-        int total = progress.TotalPoints;
+        int weaponDamage = GetWeaponReferenceDamage();
 
         int ticks;
         int radius;
         int maxHits;
-        float visualLength;
+        float visualRadius;
         float visualWidth;
+        float damageMultiplier;
 
         if (stage == 1)
         {
             ticks = 32;
-            radius = 17;
+            radius = 19;
             maxHits = 1;
-            visualLength = 62f;
-            visualWidth = 12f;
+            visualRadius = 42f;
+            visualWidth = 11f;
+            damageMultiplier = 1.30f + progress.TotalPoints * 0.02f;
         }
         else if (stage == 2)
         {
-            ticks = 52;
-            radius = 27;
+            ticks = 58;
+            radius = 29;
             maxHits = 2;
-            visualLength = 82f;
-            visualWidth = 18f;
+            visualRadius = 55f;
+            visualWidth = 15f;
+            damageMultiplier = 1.45f + progress.TotalPoints * 0.02f;
         }
         else
         {
-            // Effectively map-wide for normal Stardew maps.
-            ticks = 240;
-            radius = 40;
+            ticks = 250;
+            radius = 43;
             maxHits = 999;
-            visualLength = 108f;
-            visualWidth = 27f;
+            visualRadius = 72f;
+            visualWidth = 20f;
+            damageMultiplier = 1.60f + progress.TotalPoints * 0.02f;
         }
 
         Projectiles.Add(new SwordWave
@@ -476,18 +607,25 @@ internal sealed class CombatService
             Location = Game1.currentLocation,
             Position = origin,
             Direction = direction,
-            Speed = 24f,
+            Speed = 22f,
             RemainingTicks = ticks,
-            BaseDamage = 4 + total / 4,
+            BaseDamage = ScaleDamage(weaponDamage, damageMultiplier),
             HitboxRadius = radius,
             MaxHitEvents = maxHits,
             DistanceFalloff = 0.035f,
             PierceFalloff = stage == 1 ? 0f : 0.14f,
-            VisualLength = visualLength,
-            VisualWidth = visualWidth
+            VisualRadius = visualRadius,
+            VisualWidth = visualWidth,
+            VisualSweep = 2.55f
         });
 
-        AddPathFx(origin - direction * 18f, origin + direction * 52f, 11 + stage * 2, 9);
+        AddFrontSlashFx(
+            new Rectangle((int)origin.X - 52, (int)origin.Y - 52, 104, 104),
+            player.FacingDirection,
+            0,
+            50f,
+            10
+        );
     }
 
     private bool UseSwordPinnacle(SkillProgress progress, int stage)
@@ -498,9 +636,9 @@ internal sealed class CombatService
 
         int range = stage switch
         {
-            1 => 110,
-            2 => 155,
-            _ => 205
+            1 => 115,
+            2 => 165,
+            _ => 220
         };
 
         int hitCount = stage switch
@@ -517,7 +655,20 @@ internal sealed class CombatService
             range * 2
         );
 
-        int perHit = 1 + progress.TotalPoints / 5;
+        int weaponDamage = GetWeaponReferenceDamage();
+        float stageBonus = stage switch
+        {
+            1 => 0f,
+            2 => 0.05f,
+            _ => 0.10f
+        };
+
+        int perHit = ScaleDamage(
+            weaponDamage,
+            MultiHitMultiplier(progress, stageBonus)
+        );
+
+        AnimateSwordSkill(player, 23f);
 
         QueueMultiHit(
             location,
@@ -525,19 +676,20 @@ internal sealed class CombatService
             perHit,
             hitCount,
             tickGap: 6,
-            knockback: 0.01f,
-            facing: player.FacingDirection
+            knockback: 0.005f,
+            facing: player.FacingDirection,
+            effectCenter: new Vector2(area.Center.X, area.Center.Y),
+            effectRadius: stage == 1 ? 80f : stage == 2 ? 120f : 160f
         );
 
-        AddRadialFx(area, 20);
         location.localSound("swordswipe");
-        Cooldowns["OHGI"] = 105;
+        Cooldowns["OHGI"] = CooldownPinnacle;
         return true;
     }
 
-    // -------------------------
+    // ---------------------------------------------------------------------
     // Ultimate
-    // -------------------------
+    // ---------------------------------------------------------------------
 
     private void UpdateUltimateAura(SaveData data)
     {
@@ -562,29 +714,74 @@ internal sealed class CombatService
         }
 
         Farmer player = Game1.player;
-        Rectangle box = player.GetBoundingBox();
+        Vector2 playerCenter = CenterOf(player.GetBoundingBox());
 
-        int range = stage switch
+        // User-requested range:
+        // stage 1 ≈ previous stage-3 (~3 tiles), stage 2 = 5 tiles, stage 3 = 7.5 tiles.
+        float radiusPixels = stage switch
         {
-            1 => 78,
-            2 => 126,
-            _ => 178
+            1 => 205f,
+            2 => 320f,
+            _ => 480f
         };
 
-        Rectangle area = new(
-            box.Center.X - range,
-            box.Center.Y - range,
-            range * 2,
-            range * 2
-        );
+        int weaponDamage = GetWeaponReferenceDamage();
+        float damageMultiplier = stage switch
+        {
+            1 => 0.75f,
+            2 => 0.90f,
+            _ => 1.05f
+        };
 
-        int damage = 1 + progress.TotalPoints / 5 + (stage - 1);
+        damageMultiplier += progress.TotalPoints * 0.015f;
+        int damage = ScaleDamage(weaponDamage, damageMultiplier);
 
-        DamageArea(Game1.currentLocation, area, damage, 0f);
-        AddRadialFx(area, 11);
+        int fxIndex = 0;
 
-        // Always active, but not every single frame.
-        UltimateAuraTick = 45;
+        foreach (NPC npc in Game1.currentLocation.characters)
+        {
+            if (npc is not Monster monster || monster.Health <= 0)
+                continue;
+
+            Rectangle monsterBox = monster.GetBoundingBox();
+            Vector2 monsterCenter = CenterOf(monsterBox);
+
+            if (Vector2.Distance(playerCenter, monsterCenter) > radiusPixels)
+                continue;
+
+            // Damage is applied at the monster, and the slash effect appears ON the monster.
+            Game1.currentLocation.damageMonster(
+                monsterBox,
+                damage,
+                damage,
+                isBomb: false,
+                knockBackModifier: 0f,
+                addedPrecision: 0,
+                critChance: 0f,
+                critMultiplier: 1f,
+                triggerMonsterInvincibleTimer: false,
+                who: Game1.player
+            );
+
+            AddArcFx(
+                monsterCenter,
+                radius: Math.Max(34f, Math.Min(monsterBox.Width, monsterBox.Height) * 0.9f),
+                centerAngle: 0.4f + (fxIndex % 4) * 0.85f,
+                sweep: 2.0f,
+                width: 10f,
+                ticks: 15
+            );
+
+            fxIndex++;
+        }
+
+        // Passive, but not every frame. Higher stages feel more "mastered" by ticking a little faster.
+        UltimateAuraTick = stage switch
+        {
+            1 => 60,
+            2 => 54,
+            _ => 48
+        };
     }
 
     private bool UseUltimateFootwork(SkillProgress progress, int stage)
@@ -592,40 +789,53 @@ internal sealed class CombatService
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         int facing = player.FacingDirection;
+        int weaponDamage = GetWeaponReferenceDamage();
+
+        AnimateSwordSkill(player, 20f);
 
         Vector2 start = player.Position;
 
-        int moveSteps = stage switch
+        float maxDistancePixels = stage switch
         {
-            1 => 22,
-            2 => 40,
-            _ => 62
+            1 => 2f * 64f,
+            2 => 4f * 64f,
+            _ => 6f * 64f
         };
 
-        DashForward(player, facing, moveSteps);
+        DashForwardPixels(player, facing, maxDistancePixels);
 
         Vector2 end = player.Position;
         int thickness = stage switch
         {
-            1 => 62,
-            2 => 88,
-            _ => 118
+            1 => 64,
+            2 => 92,
+            _ => 124
         };
 
         Rectangle path = BuildPathRectangle(start, end, thickness);
-        int damage = 2 + progress.TotalPoints / 4 + (stage - 1);
+        float stageBonus = stage switch
+        {
+            1 => 0f,
+            2 => 0.15f,
+            _ => 0.30f
+        };
 
-        DamageArea(location, path, damage, 0.02f);
-        AddPathFx(start, end, 15 + stage * 4, 11);
+        int damage = ScaleDamage(
+            weaponDamage,
+            SingleHitMultiplier(progress, stageBonus)
+        );
+
+        DamageArea(location, path, damage, 0.01f);
+        AddDashSlashFx(start, end, facing, stage + 1);
 
         // No cooldown by design.
         location.localSound("swordswipe");
         return true;
     }
 
-    // -------------------------
+    // ---------------------------------------------------------------------
     // Runtime
-    // -------------------------
+    // ---------------------------------------------------------------------
 
     private void UpdatePendingHits()
     {
@@ -644,7 +854,16 @@ internal sealed class CombatService
                 continue;
 
             DamageArea(hit.Location, hit.Area, hit.Damage, hit.Knockback);
-            AddAreaFlash(hit.Area, hit.FacingDirection, 8);
+
+            AddArcFx(
+                hit.EffectCenter,
+                hit.EffectRadius,
+                FacingAngle(hit.FacingDirection) + hit.EffectVariant * 0.65f,
+                sweep: 1.95f,
+                width: 10f + (hit.EffectVariant % 2) * 2f,
+                ticks: 13
+            );
+
             PendingHits.RemoveAt(i);
         }
     }
@@ -668,8 +887,10 @@ internal sealed class CombatService
             if (wave.HitSkipTicks > 0)
             {
                 wave.HitSkipTicks--;
+
                 if (wave.RemainingTicks <= 0)
                     Projectiles.RemoveAt(i);
+
                 continue;
             }
 
@@ -703,6 +924,15 @@ internal sealed class CombatService
 
             if (hit)
             {
+                AddArcFx(
+                    wave.Position,
+                    wave.VisualRadius * 0.72f,
+                    (float)Math.Atan2(wave.Direction.Y, wave.Direction.X) + MathF.PI,
+                    2.2f,
+                    Math.Max(7f, wave.VisualWidth * 0.65f),
+                    9
+                );
+
                 wave.HitEvents++;
 
                 if (wave.HitEvents >= wave.MaxHitEvents)
@@ -711,10 +941,8 @@ internal sealed class CombatService
                     continue;
                 }
 
-                // Push the wave forward so a piercing projectile doesn't repeatedly
-                // count the same monster on adjacent update ticks.
-                wave.Position += wave.Direction * 54f;
-                wave.DistanceTravelled += 54f;
+                wave.Position += wave.Direction * 58f;
+                wave.DistanceTravelled += 58f;
                 wave.HitSkipTicks = 2;
             }
 
@@ -725,11 +953,12 @@ internal sealed class CombatService
 
     private void UpdateEffects()
     {
-        for (int i = Effects.Count - 1; i >= 0; i--)
+        for (int i = ArcEffects.Count - 1; i >= 0; i--)
         {
-            Effects[i].Ticks--;
-            if (Effects[i].Ticks <= 0)
-                Effects.RemoveAt(i);
+            ArcEffects[i].Ticks--;
+
+            if (ArcEffects[i].Ticks <= 0)
+                ArcEffects.RemoveAt(i);
         }
     }
 
@@ -740,12 +969,21 @@ internal sealed class CombatService
         int hitCount,
         int tickGap,
         float knockback,
-        int facing
+        int facing,
+        Vector2 effectCenter,
+        float effectRadius
     )
     {
-        // First hit happens immediately; remaining hits are deliberately spaced out
-        // so damage numbers and hit reactions are visible as separate strikes.
         DamageArea(location, area, damage, knockback);
+
+        AddArcFx(
+            effectCenter,
+            effectRadius,
+            FacingAngle(facing) - 0.5f,
+            sweep: 1.95f,
+            width: 11f,
+            ticks: 13
+        );
 
         for (int i = 1; i < hitCount; i++)
         {
@@ -756,14 +994,72 @@ internal sealed class CombatService
                 Damage = damage,
                 Knockback = knockback,
                 Ticks = i * tickGap,
-                FacingDirection = facing
+                FacingDirection = facing,
+                EffectCenter = effectCenter,
+                EffectRadius = effectRadius + (i % 3 - 1) * 9f,
+                EffectVariant = i
             });
         }
     }
 
-    private static bool HasSwordEquipped()
+    // ---------------------------------------------------------------------
+    // Damage / animation / geometry
+    // ---------------------------------------------------------------------
+
+    private static bool TryGetEquippedSword(out MeleeWeapon? weapon)
     {
-        return Game1.player.CurrentTool is MeleeWeapon;
+        weapon = Game1.player.CurrentTool as MeleeWeapon;
+        return weapon is not null;
+    }
+
+    private static int GetWeaponReferenceDamage()
+    {
+        if (!TryGetEquippedSword(out MeleeWeapon? weapon) || weapon is null)
+            return 1;
+
+        int min = Math.Max(1, weapon.minDamage.Value);
+        int max = Math.Max(min, weapon.maxDamage.Value);
+        return Math.Max(1, (min + max) / 2);
+    }
+
+    private static float SingleHitMultiplier(
+        SkillProgress progress,
+        float stageBonus = 0f
+    )
+    {
+        // Base single-hit skill = 130% of equipped sword average damage.
+        // Each invested SP adds +2 percentage points so upgrades are easy to feel.
+        return 1.30f + stageBonus + progress.TotalPoints * 0.02f;
+    }
+
+    private static float MultiHitMultiplier(
+        SkillProgress progress,
+        float stageBonus = 0f
+    )
+    {
+        // Base multi-hit skill = 75% PER HIT.
+        // Each invested SP adds +1.5 percentage points per hit.
+        return 0.75f + stageBonus + progress.TotalPoints * 0.015f;
+    }
+
+    private static int ScaleDamage(int weaponReferenceDamage, float multiplier)
+    {
+        return Math.Max(1, (int)Math.Round(weaponReferenceDamage * multiplier));
+    }
+
+    private static void AnimateSwordSkill(Farmer player, float interval)
+    {
+        int animation = player.FacingDirection switch
+        {
+            0 => 248,
+            1 => 240,
+            2 => 232,
+            3 => 256,
+            _ => 232
+        };
+
+        player.FarmerSprite.PauseForSingleAnimation = false;
+        player.FarmerSprite.animateOnce(animation, interval, 6);
     }
 
     private static int GetUnlockedStage(SkillProgress progress)
@@ -780,12 +1076,28 @@ internal sealed class CombatService
         return 0;
     }
 
-    private static void DashForward(Farmer player, int facing, int steps)
+    private static void DashForwardPixels(
+        Farmer player,
+        int facing,
+        float maxDistancePixels
+    )
     {
-        for (int i = 0; i < steps; i++)
+        Vector2 start = player.Position;
+
+        // Safety cap prevents any unexpected infinite movement loop.
+        for (int i = 0; i < 512; i++)
         {
+            if (Vector2.Distance(start, player.Position) >= maxDistancePixels)
+                break;
+
             Vector2 before = player.Position;
-            player.tryToMoveInDirection(facing, isFarmer: true, damagesFarmer: 0, glider: false);
+
+            player.tryToMoveInDirection(
+                facing,
+                isFarmer: true,
+                damagesFarmer: 0,
+                glider: false
+            );
 
             if (player.Position == before)
                 break;
@@ -828,7 +1140,12 @@ internal sealed class CombatService
         );
     }
 
-    private static void DamageArea(GameLocation location, Rectangle area, int damage, float knockback)
+    private static void DamageArea(
+        GameLocation location,
+        Rectangle area,
+        int damage,
+        float knockback
+    )
     {
         location.damageMonster(
             area,
@@ -844,76 +1161,129 @@ internal sealed class CombatService
         );
     }
 
-    private void AddPathFx(Vector2 start, Vector2 end, float width, int ticks)
+    // ---------------------------------------------------------------------
+    // Visual FX
+    // ---------------------------------------------------------------------
+
+    private void AddDashSlashFx(Vector2 start, Vector2 end, int facing, int count)
     {
-        Effects.Add(new SlashFx
+        Vector2 worldStart = start + new Vector2(32f, 32f);
+        Vector2 worldEnd = end + new Vector2(32f, 32f);
+
+        for (int i = 0; i < count; i++)
         {
-            Start = start + new Vector2(32f, 32f),
-            End = end + new Vector2(32f, 32f),
+            float t = (i + 1f) / (count + 1f);
+            Vector2 center = Vector2.Lerp(worldStart, worldEnd, t);
+
+            AddArcFx(
+                center,
+                38f + i * 8f,
+                FacingAngle(facing) + (i % 2 == 0 ? -0.55f : 0.55f),
+                sweep: 1.95f,
+                width: 9f + i * 1.5f,
+                ticks: 11 + i * 2
+            );
+        }
+    }
+
+    private void AddIssenFx(
+        Vector2 start,
+        Vector2 end,
+        int facing,
+        int widthPixels,
+        int stage
+    )
+    {
+        Vector2 startCenter = start + new Vector2(32f, 32f);
+        Vector2 endCenter = end + new Vector2(32f, 32f);
+        Vector2 direction = DirectionVector(facing);
+        Vector2 perpendicular = new(-direction.Y, direction.X);
+
+        int laneCount = stage switch
+        {
+            1 => 1,
+            2 => 5,
+            _ => 9
+        };
+
+        float spread = Math.Max(0f, widthPixels - 64f);
+
+        for (int lane = 0; lane < laneCount; lane++)
+        {
+            float laneT = laneCount == 1 ? 0.5f : lane / (float)(laneCount - 1);
+            float offset = -spread / 2f + spread * laneT;
+
+            for (int along = 1; along <= 3 + stage; along++)
+            {
+                float t = along / (float)(4 + stage);
+                Vector2 center =
+                    Vector2.Lerp(startCenter, endCenter, t)
+                    + perpendicular * offset;
+
+                AddArcFx(
+                    center,
+                    radius: 38f + stage * 11f + along * 3f,
+                    centerAngle: FacingAngle(facing)
+                        + ((lane + along) % 2 == 0 ? -0.55f : 0.55f),
+                    sweep: 2.10f + stage * 0.10f,
+                    width: 9f + stage * 2.5f,
+                    ticks: 12 + stage * 3
+                );
+            }
+        }
+    }
+
+    private void AddFrontSlashFx(
+        Rectangle area,
+        int facing,
+        int variant,
+        float radius,
+        int ticks
+    )
+    {
+        Vector2 center = new(area.Center.X, area.Center.Y);
+
+        AddArcFx(
+            center,
+            radius,
+            FacingAngle(facing) + (variant % 2 == 0 ? -0.25f : 0.35f),
+            sweep: variant == 0 ? 2.0f : 2.25f,
+            width: variant == 0 ? 12f : 15f,
+            ticks: ticks
+        );
+    }
+
+    private void AddArcFx(
+        Vector2 center,
+        float radius,
+        float centerAngle,
+        float sweep,
+        float width,
+        int ticks
+    )
+    {
+        ArcEffects.Add(new ArcFx
+        {
+            Center = center,
+            Radius = radius,
+            CenterAngle = centerAngle,
+            Sweep = sweep,
             Width = width,
             Ticks = ticks,
             MaxTicks = ticks
         });
     }
 
-    private void AddAreaFlash(Rectangle area, int facingDirection, int ticks)
+    private static float FacingAngle(int facingDirection)
     {
-        Vector2 center = new(area.Center.X, area.Center.Y);
-        Vector2 dir = DirectionVector(facingDirection);
-        Vector2 perpendicular = new(-dir.Y, dir.X);
-
-        float half = Math.Max(area.Width, area.Height) * 0.45f;
-
-        Effects.Add(new SlashFx
+        return facingDirection switch
         {
-            Start = center - perpendicular * half,
-            End = center + perpendicular * half,
-            Width = 12f,
-            Ticks = ticks,
-            MaxTicks = ticks
-        });
-    }
-
-    private void AddRadialFx(Rectangle area, int ticks)
-    {
-        Vector2 c = new(area.Center.X, area.Center.Y);
-        float r = Math.Min(area.Width, area.Height) * 0.42f;
-
-        Effects.Add(new SlashFx
-        {
-            Start = c + new Vector2(-r, 0f),
-            End = c + new Vector2(r, 0f),
-            Width = 13f,
-            Ticks = ticks,
-            MaxTicks = ticks
-        });
-
-        Effects.Add(new SlashFx
-        {
-            Start = c + new Vector2(0f, -r),
-            End = c + new Vector2(0f, r),
-            Width = 13f,
-            Ticks = ticks,
-            MaxTicks = ticks
-        });
-
-        Effects.Add(new SlashFx
-        {
-            Start = c + new Vector2(-r * 0.75f, -r * 0.75f),
-            End = c + new Vector2(r * 0.75f, r * 0.75f),
-            Width = 10f,
-            Ticks = ticks,
-            MaxTicks = ticks
-        });
-
-        Effects.Add(new SlashFx
-        {
-            Start = c + new Vector2(r * 0.75f, -r * 0.75f),
-            End = c + new Vector2(-r * 0.75f, r * 0.75f),
-            Width = 10f,
-            Ticks = ticks,
-            MaxTicks = ticks
-        });
+            0 => -MathF.PI / 2f,
+            1 => 0f,
+            2 => MathF.PI / 2f,
+            3 => MathF.PI,
+            _ => 0f
+        };
     }
 
     private static Vector2 DirectionVector(int facingDirection)
@@ -938,7 +1308,45 @@ internal sealed class CombatService
         return world - new Vector2(Game1.viewport.X, Game1.viewport.Y);
     }
 
-    private static void DrawLine(SpriteBatch b, Vector2 start, Vector2 end, float width, Color color)
+    private static void DrawArc(
+        SpriteBatch b,
+        Vector2 center,
+        float radius,
+        float centerAngle,
+        float sweep,
+        float width,
+        Color color,
+        int segments
+    )
+    {
+        float startAngle = centerAngle - sweep / 2f;
+        Vector2 previous = center + new Vector2(
+            MathF.Cos(startAngle),
+            MathF.Sin(startAngle)
+        ) * radius;
+
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = i / (float)segments;
+            float angle = startAngle + sweep * t;
+
+            Vector2 current = center + new Vector2(
+                MathF.Cos(angle),
+                MathF.Sin(angle)
+            ) * radius;
+
+            DrawLine(b, previous, current, width, color);
+            previous = current;
+        }
+    }
+
+    private static void DrawLine(
+        SpriteBatch b,
+        Vector2 start,
+        Vector2 end,
+        float width,
+        Color color
+    )
     {
         Vector2 delta = end - start;
         float length = delta.Length();
@@ -968,7 +1376,11 @@ internal sealed class CombatService
         public int Damage { get; set; }
         public float Knockback { get; set; }
         public int Ticks { get; set; }
+
         public int FacingDirection { get; set; }
+        public Vector2 EffectCenter { get; set; }
+        public float EffectRadius { get; set; }
+        public int EffectVariant { get; set; }
     }
 
     private sealed class SwordWave
@@ -990,14 +1402,17 @@ internal sealed class CombatService
         public float DistanceFalloff { get; set; }
         public float PierceFalloff { get; set; }
 
-        public float VisualLength { get; set; } = 72f;
-        public float VisualWidth { get; set; } = 16f;
+        public float VisualRadius { get; set; } = 48f;
+        public float VisualWidth { get; set; } = 13f;
+        public float VisualSweep { get; set; } = 2.45f;
     }
 
-    private sealed class SlashFx
+    private sealed class ArcFx
     {
-        public Vector2 Start { get; set; }
-        public Vector2 End { get; set; }
+        public Vector2 Center { get; set; }
+        public float Radius { get; set; }
+        public float CenterAngle { get; set; }
+        public float Sweep { get; set; }
         public float Width { get; set; }
         public int Ticks { get; set; }
         public int MaxTicks { get; set; }
