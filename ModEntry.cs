@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.GameData.Objects;
 using SwordMastery.Models;
 using SwordMastery.Services;
 using SwordMastery.UI;
@@ -13,6 +14,10 @@ namespace SwordMastery;
 internal sealed class ModEntry : Mod
 {
     private const string SaveKey = "SwordMastery.SaveData";
+
+    private string OhgiSecretBookId => $"{ModManifest.UniqueID}_OhgiSecretBook";
+    private string InsightDropId => $"{ModManifest.UniqueID}_InsightDrop";
+    private string UnlockItemTextureAsset => $"Mods/{ModManifest.UniqueID}/UnlockItems";
 
     private ModConfig Config = null!;
     private SaveData Data = new();
@@ -37,6 +42,7 @@ internal sealed class ModEntry : Mod
         helper.Events.Display.RenderedHud += OnRenderedHud;
         helper.Events.Display.RenderedWorld += OnRenderedWorld;
         helper.Events.Input.ButtonPressed += OnButtonPressed;
+        helper.Events.Content.AssetRequested += OnAssetRequested;
 
         helper.ConsoleCommands.Add("sm_status", "Show Sword Mastery status.", CommandStatus);
         helper.ConsoleCommands.Add("sm_add", "Allocate a point. Usage: sm_add basic A | sm_add ohgi | sm_add ultimate", CommandAdd);
@@ -47,6 +53,62 @@ internal sealed class ModEntry : Mod
         helper.ConsoleCommands.Add("sm_reset", "Pay the configured gold cost and schedule respec for next morning.", CommandReset);
 
         Monitor.Log("Sword Mastery prototype loaded.", LogLevel.Info);
+    }
+
+    private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
+    {
+        if (e.NameWithoutLocale.IsEquivalentTo(UnlockItemTextureAsset))
+        {
+            e.LoadFromModFile<Texture2D>(
+                "assets/unlock_items.png",
+                AssetLoadPriority.Exclusive
+            );
+            return;
+        }
+
+        if (!e.NameWithoutLocale.IsEquivalentTo("Data/Objects"))
+            return;
+
+        e.Edit(asset =>
+        {
+            var objects = asset.AsDictionary<string, ObjectData>().Data;
+
+            objects[OhgiSecretBookId] = new ObjectData
+            {
+                Name = OhgiSecretBookId,
+                DisplayName = "오의 비책",
+                Description = "오의를 해방하는 비법서. 손에 들고 행동 버튼으로 사용한다.",
+                Type = "Crafting",
+                Category = 0,
+                Price = 0,
+                Texture = UnlockItemTextureAsset,
+                SpriteIndex = 0,
+                Edibility = -300,
+                CanBeGivenAsGift = false,
+                CanBeTrashed = true,
+                ExcludeFromFishingCollection = true,
+                ExcludeFromShippingCollection = true,
+                ExcludeFromRandomSale = true
+            };
+
+            objects[InsightDropId] = new ObjectData
+            {
+                Name = InsightDropId,
+                DisplayName = "깨달음의 물방울",
+                Description = "극의를 해방하는 응축된 깨달음. 손에 들고 행동 버튼으로 사용한다.",
+                Type = "Crafting",
+                Category = 0,
+                Price = 0,
+                Texture = UnlockItemTextureAsset,
+                SpriteIndex = 1,
+                Edibility = -300,
+                CanBeGivenAsGift = false,
+                CanBeTrashed = true,
+                ExcludeFromFishingCollection = true,
+                ExcludeFromShippingCollection = true,
+                ExcludeFromRandomSale = true
+            };
+        });
     }
 
     private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
@@ -302,6 +364,37 @@ internal sealed class ModEntry : Mod
             fieldId: "DebugUltimateAccess"
         );
 
+        gmcm.AddSectionTitle(
+            mod: ModManifest,
+            text: () => "DEBUG 실행 버튼"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => false,
+            setValue: value =>
+            {
+                if (value)
+                    DebugActivateAllSkills();
+            },
+            name: () => "[실행] 모든 스킬 활성화",
+            tooltip: () => "모든 기술을 15/15 MASTER 처리하고 오의/극의 해방 상태로 만듭니다. 분기 선택은 검술창에서 합니다.",
+            fieldId: "DebugActivateAllSkills"
+        );
+
+        gmcm.AddBoolOption(
+            mod: ModManifest,
+            getValue: () => false,
+            setValue: value =>
+            {
+                if (value)
+                    DebugGiveUnlockItems();
+            },
+            name: () => "[받기] 해방 아이템 2종 지급",
+            tooltip: () => "오의 비책 1개와 깨달음의 물방울 1개를 인벤토리에 지급합니다.",
+            fieldId: "DebugGiveUnlockItems"
+        );
+
         Monitor.Log("Generic Mod Config Menu integration registered.", LogLevel.Info);
     }
 
@@ -318,6 +411,132 @@ internal sealed class ModEntry : Mod
         Data.UnspentSkillPoints = Math.Max(0, level - spentPoints);
 
         RefreshUnlockState(showMessages: false);
+    }
+
+    private void DebugActivateAllSkills()
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        Data.EnsureSkillKeys();
+
+        foreach (SkillProgress progress in Data.Skills.Values)
+        {
+            progress.Stage1 = 5;
+            progress.Stage2 = 5;
+            progress.Stage3 = 5;
+        }
+
+        Data.OhgiAccessGranted = true;
+        Data.UltimateAccessGranted = true;
+        Data.OhgiQuestAvailable = false;
+        Data.UltimateQuestAvailable = false;
+
+        // Keep branch exclusivity intact, but let the player choose any branch from the skill menu.
+        Data.SelectedOhgi = null;
+        Data.SelectedUltimate = null;
+
+        Data.UnspentSkillPoints = Math.Max(Data.UnspentSkillPoints, 200);
+
+        Game1.addHUDMessage(new HUDMessage(
+            "DEBUG: 모든 스킬을 MASTER 처리했습니다. 오의/극의 분기는 검술창에서 선택하세요.",
+            HUDMessage.newQuest_type
+        ));
+        Game1.playSound("achievement");
+    }
+
+    private void DebugGiveUnlockItems()
+    {
+        if (!Context.IsWorldReady)
+            return;
+
+        bool book = Game1.player.addItemToInventoryBool(
+            ItemRegistry.Create($"(O){OhgiSecretBookId}")
+        );
+
+        bool drop = Game1.player.addItemToInventoryBool(
+            ItemRegistry.Create($"(O){InsightDropId}")
+        );
+
+        if (book && drop)
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                "DEBUG: 오의 비책과 깨달음의 물방울을 지급했습니다.",
+                HUDMessage.newQuest_type
+            ));
+            Game1.playSound("getNewSpecialItem");
+        }
+        else
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                "인벤토리 공간이 부족합니다. 일부 아이템은 지급되지 않았습니다."
+            ));
+            Game1.playSound("cancel");
+        }
+    }
+
+    private bool TryUseUnlockItem(SButton button)
+    {
+        if (!button.IsActionButton())
+            return false;
+
+        StardewValley.Object? held = Game1.player.ActiveObject;
+        if (held is null)
+            return false;
+
+        if (held.QualifiedItemId == $"(O){OhgiSecretBookId}")
+        {
+            if (Data.OhgiAccessGranted)
+            {
+                Game1.addHUDMessage(new HUDMessage("오의는 이미 해방되어 있습니다."));
+                Game1.playSound("cancel");
+                return true;
+            }
+
+            Skills.GrantOhgiAccess(Data);
+            ConsumeActiveObject(held);
+
+            Game1.addHUDMessage(new HUDMessage(
+                "오의가 해방되었습니다.",
+                HUDMessage.newQuest_type
+            ));
+            Game1.playSound("getNewSpecialItem");
+            return true;
+        }
+
+        if (held.QualifiedItemId == $"(O){InsightDropId}")
+        {
+            if (Data.UltimateAccessGranted)
+            {
+                Game1.addHUDMessage(new HUDMessage("극의는 이미 해방되어 있습니다."));
+                Game1.playSound("cancel");
+                return true;
+            }
+
+            Skills.GrantUltimateAccess(Data);
+            ConsumeActiveObject(held);
+
+            Game1.addHUDMessage(new HUDMessage(
+                "극의가 해방되었습니다.",
+                HUDMessage.newQuest_type
+            ));
+            Game1.playSound("stardrop");
+            return true;
+        }
+
+        return false;
+    }
+
+    private static void ConsumeActiveObject(StardewValley.Object held)
+    {
+        held.Stack--;
+
+        if (held.Stack <= 0
+            && Game1.player.CurrentToolIndex >= 0
+            && Game1.player.CurrentToolIndex < Game1.player.Items.Count)
+        {
+            Game1.player.Items[Game1.player.CurrentToolIndex] = null;
+        }
     }
 
     private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
@@ -340,6 +559,14 @@ internal sealed class ModEntry : Mod
             RefreshUnlockState(showMessages: false);
             Game1.activeClickableMenu = new SkillTreeMenu(Data, Config, Progression, Skills, Helper);
             Game1.playSound("bigSelect");
+            return;
+        }
+
+        // Quest unlock items are used directly from the active inventory slot.
+        // Handle them before combat input so the action button isn't passed through.
+        if (Game1.activeClickableMenu is null && TryUseUnlockItem(e.Button))
+        {
+            Helper.Input.Suppress(e.Button);
             return;
         }
 

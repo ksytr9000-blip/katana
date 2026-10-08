@@ -8,6 +8,10 @@ internal sealed class SaveData
     public int SwordExperience { get; set; }
     public int UnspentSkillPoints { get; set; }
 
+    // Remember the last equipped melee weapon's average damage so active sword skills
+    // can still be used after switching to another tool or empty hand.
+    public int LastSwordReferenceDamage { get; set; } = 20;
+
     public int LastObservedMonsterKills { get; set; }
     public bool KillCounterInitialized { get; set; }
 
@@ -23,7 +27,7 @@ internal sealed class SaveData
     public bool OhgiAccessGranted { get; set; }
     public bool UltimateAccessGranted { get; set; }
 
-    // Quest availability flags. Actual quest/item implementation comes next.
+    // Quest availability flags. Unlock items consume these by granting permanent access.
     public bool OhgiQuestAvailable { get; set; }
     public bool UltimateQuestAvailable { get; set; }
 

@@ -1,8 +1,10 @@
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Monsters;
+using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 using SwordMastery.Models;
 
@@ -26,6 +28,7 @@ internal sealed class CombatService
     private const int CooldownC = 300;       // 5.0 sec
     private const int CooldownIssen = 720;   // 12.0 sec
     private const int CooldownPinnacle = 570; // 9.5 sec
+    private const int InfinityBladeReferenceDamage = 90; // Infinity Blade 80-100 average.
 
     private readonly Dictionary<string, int> Cooldowns = new()
     {
@@ -38,6 +41,7 @@ internal sealed class CombatService
     private readonly List<PendingHit> PendingHits = new();
     private readonly List<SwordWave> Projectiles = new();
     private readonly List<ArcFx> ArcEffects = new();
+    private readonly List<LineFx> LineEffects = new();
 
     private int UltimateAuraTick;
 
@@ -81,12 +85,6 @@ internal sealed class CombatService
     {
         branch = branch.ToUpperInvariant();
 
-        if (!TryGetEquippedSword(out _))
-        {
-            message = "검을 장비해야 사용할 수 있습니다.";
-            return false;
-        }
-
         string id = $"Basic{branch}";
         if (!data.Skills.TryGetValue(id, out SkillProgress? progress))
         {
@@ -109,9 +107,9 @@ internal sealed class CombatService
 
         bool used = branch switch
         {
-            "A" => UseSwordsmanStep(progress, stage),
-            "B" => UseSlash(progress, stage),
-            "C" => UseCalicoStyle(progress, stage),
+            "A" => UseSwordsmanStep(progress, stage, data),
+            "B" => UseSlash(progress, stage, data),
+            "C" => UseCalicoStyle(progress, stage, data),
             _ => false
         };
 
@@ -149,12 +147,6 @@ internal sealed class CombatService
             return false;
         }
 
-        if (!TryGetEquippedSword(out _))
-        {
-            message = "검을 장비해야 사용할 수 있습니다.";
-            return false;
-        }
-
         if (Cooldowns["OHGI"] > 0)
         {
             message = $"오의 재사용 대기 {Cooldowns["OHGI"] / 60f:0.0}초";
@@ -163,8 +155,8 @@ internal sealed class CombatService
 
         bool used = branch switch
         {
-            "A" => UseIssen(progress, stage),
-            "C" => UseSwordPinnacle(progress, stage),
+            "A" => UseIssen(progress, stage, data),
+            "C" => UseSwordPinnacle(progress, stage, data),
             _ => false
         };
 
@@ -202,14 +194,8 @@ internal sealed class CombatService
             return false;
         }
 
-        if (!TryGetEquippedSword(out _))
-        {
-            message = "검을 장비해야 사용할 수 있습니다.";
-            return false;
-        }
-
         // 보법의 극은 컨셉대로 쿨다운 없음.
-        UseUltimateFootwork(progress, stage);
+        UseUltimateFootwork(progress, stage, data);
         message = "";
         return true;
     }
@@ -230,11 +216,13 @@ internal sealed class CombatService
         if (stage <= 0)
             return;
 
-        SpawnPassiveSwordWave(progress, stage);
+        SpawnPassiveSwordWave(progress, stage, data);
     }
 
     public void Update(SaveData data)
     {
+        RememberCurrentSword(data);
+
         foreach (string key in Cooldowns.Keys.ToArray())
         {
             if (Cooldowns[key] > 0)
@@ -254,7 +242,7 @@ internal sealed class CombatService
             float alpha = Math.Clamp(fx.Ticks / (float)fx.MaxTicks, 0f, 1f);
             Vector2 center = WorldToScreen(fx.Center);
 
-            DrawArc(
+            DrawCrescent(
                 b,
                 center,
                 fx.Radius,
@@ -262,10 +250,10 @@ internal sealed class CombatService
                 fx.Sweep,
                 fx.Width,
                 new Color(55, 185, 255) * alpha,
-                segments: 12
+                segments: 16
             );
 
-            DrawArc(
+            DrawCrescent(
                 b,
                 center,
                 fx.Radius - Math.Max(2f, fx.Width * 0.22f),
@@ -273,7 +261,30 @@ internal sealed class CombatService
                 fx.Sweep,
                 Math.Max(2f, fx.Width * 0.34f),
                 Color.White * Math.Min(1f, alpha + 0.15f),
-                segments: 12
+                segments: 16
+            );
+        }
+
+        foreach (LineFx fx in LineEffects)
+        {
+            float alpha = Math.Clamp(fx.Ticks / (float)fx.MaxTicks, 0f, 1f);
+            Vector2 start = WorldToScreen(fx.Start);
+            Vector2 end = WorldToScreen(fx.End);
+
+            DrawLine(
+                b,
+                start,
+                end,
+                fx.Width,
+                new Color(70, 205, 255) * alpha
+            );
+
+            DrawLine(
+                b,
+                start,
+                end,
+                Math.Max(2f, fx.Width * 0.28f),
+                Color.White * Math.Min(1f, alpha + 0.15f)
             );
         }
 
@@ -282,27 +293,27 @@ internal sealed class CombatService
             Vector2 center = WorldToScreen(wave.Position);
             float directionAngle = (float)Math.Atan2(wave.Direction.Y, wave.Direction.X);
 
-            // Curved crescent, not a laser/bar.
-            DrawArc(
+            // True crescent: the ends taper and the convex side faces the travel direction.
+            DrawCrescent(
                 b,
                 center,
                 wave.VisualRadius,
-                directionAngle + MathF.PI,
+                directionAngle,
                 wave.VisualSweep,
                 wave.VisualWidth,
-                new Color(55, 195, 255) * 0.92f,
-                segments: 14
+                new Color(55, 195, 255) * 0.94f,
+                segments: 18
             );
 
-            DrawArc(
+            DrawCrescent(
                 b,
                 center,
-                wave.VisualRadius - wave.VisualWidth * 0.28f,
-                directionAngle + MathF.PI,
+                wave.VisualRadius - Math.Max(3f, wave.VisualWidth * 0.30f),
+                directionAngle,
                 wave.VisualSweep,
-                Math.Max(2.5f, wave.VisualWidth * 0.33f),
-                Color.White * 0.95f,
-                segments: 14
+                Math.Max(2.5f, wave.VisualWidth * 0.30f),
+                Color.White * 0.96f,
+                segments: 18
             );
         }
     }
@@ -311,7 +322,7 @@ internal sealed class CombatService
     // Basic skills
     // ---------------------------------------------------------------------
 
-    private bool UseSwordsmanStep(SkillProgress progress, int stage)
+    private bool UseSwordsmanStep(SkillProgress progress, int stage, SaveData data)
     {
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
@@ -330,11 +341,12 @@ internal sealed class CombatService
             _ => 4f * 64f
         };
 
-        DashForwardPixels(player, facing, maxDistancePixels);
+        DashForwardPixels(player, location, facing, maxDistancePixels);
         Vector2 end = player.Position;
 
         Rectangle path = BuildPathRectangle(start, end, 64);
-        int weaponDamage = GetWeaponReferenceDamage();
+        ClearSwordCuttableObstacles(location, path);
+        int weaponDamage = GetWeaponReferenceDamage(data);
 
         if (stage == 2)
         {
@@ -360,7 +372,7 @@ internal sealed class CombatService
                 path,
                 perHit,
                 hitCount: 4,
-                tickGap: 8,
+                tickGap: 6,
                 knockback: 0.01f,
                 facing: facing,
                 effectCenter: new Vector2(path.Center.X, path.Center.Y),
@@ -379,12 +391,12 @@ internal sealed class CombatService
         return true;
     }
 
-    private bool UseSlash(SkillProgress progress, int stage)
+    private bool UseSlash(SkillProgress progress, int stage, SaveData data)
     {
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         int facing = player.FacingDirection;
-        int weaponDamage = GetWeaponReferenceDamage();
+        int weaponDamage = GetWeaponReferenceDamage(data);
 
         AnimateSwordSkill(player, 36f);
 
@@ -396,7 +408,7 @@ internal sealed class CombatService
                 SingleHitMultiplier(progress)
             );
 
-            DamageArea(location, area, damage, 0.12f);
+            DamageMonstersIgnoringTerrain(location, area, damage, 0.12f);
             AddFrontSlashFx(area, facing, 0, 60f, 15);
         }
         else if (stage == 2)
@@ -407,7 +419,7 @@ internal sealed class CombatService
                 SingleHitMultiplier(progress, 0.15f)
             );
 
-            DamageArea(location, area, damage, 0.12f);
+            DamageMonstersIgnoringTerrain(location, area, damage, 0.12f);
             AddFrontSlashFx(area, facing, 1, 88f, 16);
         }
         else
@@ -428,11 +440,14 @@ internal sealed class CombatService
                 ),
                 HitboxRadius = 25,
                 MaxHitEvents = 1,
-                DistanceFalloff = 0f,
+                DistanceFalloff = 0.055f,
                 PierceFalloff = 0f,
-                VisualRadius = 48f,
-                VisualWidth = 13f,
-                VisualSweep = 2.45f
+                MaxDistancePixels = 6f * 64f,
+                StopAtMapWalls = true,
+                StopAtSolidObjects = true,
+                VisualRadius = 52f,
+                VisualWidth = 15f,
+                VisualSweep = 2.55f
             });
 
             AddFrontSlashFx(
@@ -449,12 +464,12 @@ internal sealed class CombatService
         return true;
     }
 
-    private bool UseCalicoStyle(SkillProgress progress, int stage)
+    private bool UseCalicoStyle(SkillProgress progress, int stage, SaveData data)
     {
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         int facing = player.FacingDirection;
-        int weaponDamage = GetWeaponReferenceDamage();
+        int weaponDamage = GetWeaponReferenceDamage(data);
 
         AnimateSwordSkill(player, 27f);
 
@@ -491,11 +506,12 @@ internal sealed class CombatService
             area,
             perHitDamage,
             hitCount,
-            tickGap: 8,
+            tickGap: 5,
             knockback: 0.01f,
             facing: facing,
             effectCenter: new Vector2(area.Center.X, area.Center.Y),
-            effectRadius: stage == 1 ? 58f : stage == 2 ? 82f : 102f
+            effectRadius: stage == 1 ? 64f : stage == 2 ? 88f : 112f,
+            visualStyle: 1
         );
 
         location.localSound("swordswipe");
@@ -507,7 +523,7 @@ internal sealed class CombatService
     // Ohgi
     // ---------------------------------------------------------------------
 
-    private bool UseIssen(SkillProgress progress, int stage)
+    private bool UseIssen(SkillProgress progress, int stage, SaveData data)
     {
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
@@ -524,7 +540,7 @@ internal sealed class CombatService
             _ => 8f * 64f
         };
 
-        DashForwardPixels(player, facing, maxDistancePixels);
+        DashForwardPixels(player, location, facing, maxDistancePixels);
         Vector2 end = player.Position;
 
         // User-requested path width:
@@ -537,10 +553,11 @@ internal sealed class CombatService
         };
 
         Rectangle path = BuildPathRectangle(start, end, width);
+        ClearSwordCuttableObstacles(location, path);
 
         // Issen never scales its damage.
         // It is a true finishing technique: exact 99,999 damage and guaranteed critical.
-        DamageAreaForcedCritical(
+        bool hitAnything = DamageAreaForcedCritical(
             location,
             path,
             damage: 99999,
@@ -548,52 +565,77 @@ internal sealed class CombatService
         );
 
         AddIssenFx(start, end, facing, width, stage);
+
+        // Keep the original straight "cut-through" trail along the entire dash path.
+        AddLineFx(
+            start + new Vector2(32f, 32f),
+            end + new Vector2(32f, 32f),
+            width: stage == 1 ? 12f : stage == 2 ? 18f : 24f,
+            ticks: stage == 1 ? 16 : stage == 2 ? 20 : 24
+        );
+
         location.localSound("swordswipe");
+
+        if (hitAnything)
+            Game1.playSound("crit");
+
         Cooldowns["OHGI"] = CooldownIssen;
         return true;
     }
 
-    private void SpawnPassiveSwordWave(SkillProgress progress, int stage)
+    private void SpawnPassiveSwordWave(SkillProgress progress, int stage, SaveData data)
     {
         Farmer player = Game1.player;
         Vector2 direction = DirectionVector(player.FacingDirection);
         Vector2 origin = CenterOf(player.GetBoundingBox()) + direction * 50f;
 
-        int weaponDamage = GetWeaponReferenceDamage();
+        int weaponDamage = GetWeaponReferenceDamage(data);
 
         int ticks;
         int radius;
         int maxHits;
+        float maxDistancePixels;
         float visualRadius;
         float visualWidth;
+        float distanceFalloff;
         float damageMultiplier;
 
         if (stage == 1)
         {
-            ticks = 32;
+            ticks = 64;
             radius = 19;
             maxHits = 1;
+            maxDistancePixels = 6f * 64f;
             visualRadius = 42f;
             visualWidth = 11f;
-            damageMultiplier = 1.30f + progress.TotalPoints * 0.02f;
+            distanceFalloff = 0.060f;
+            damageMultiplier = 1.30f + progress.TotalPoints * 0.04f;
         }
         else if (stage == 2)
         {
-            ticks = 58;
-            radius = 29;
+            ticks = 96;
+            radius = 43;
             maxHits = 2;
-            visualRadius = 55f;
-            visualWidth = 15f;
-            damageMultiplier = 1.45f + progress.TotalPoints * 0.02f;
+            maxDistancePixels = 10f * 64f;
+
+            // Stage 2 now uses the previous stage-3 visual size.
+            visualRadius = 72f;
+            visualWidth = 20f;
+            distanceFalloff = 0.045f;
+            damageMultiplier = 1.45f + progress.TotalPoints * 0.04f;
         }
         else
         {
-            ticks = 250;
-            radius = 43;
+            ticks = 140;
+            radius = 67;
             maxHits = 999;
-            visualRadius = 72f;
-            visualWidth = 20f;
-            damageMultiplier = 1.60f + progress.TotalPoints * 0.02f;
+            maxDistancePixels = 16f * 64f;
+
+            // Grow by the same amount again from stage 2 -> 3.
+            visualRadius = 102f;
+            visualWidth = 29f;
+            distanceFalloff = 0.030f;
+            damageMultiplier = 1.60f + progress.TotalPoints * 0.04f;
         }
 
         Projectiles.Add(new SwordWave
@@ -606,8 +648,11 @@ internal sealed class CombatService
             BaseDamage = ScaleDamage(weaponDamage, damageMultiplier),
             HitboxRadius = radius,
             MaxHitEvents = maxHits,
-            DistanceFalloff = 0.035f,
+            DistanceFalloff = distanceFalloff,
             PierceFalloff = stage == 1 ? 0f : 0.14f,
+            MaxDistancePixels = maxDistancePixels,
+            StopAtMapWalls = true,
+            StopAtSolidObjects = false,
             VisualRadius = visualRadius,
             VisualWidth = visualWidth,
             VisualSweep = 2.55f
@@ -622,17 +667,18 @@ internal sealed class CombatService
         );
     }
 
-    private bool UseSwordPinnacle(SkillProgress progress, int stage)
+    private bool UseSwordPinnacle(SkillProgress progress, int stage, SaveData data)
     {
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         Rectangle box = player.GetBoundingBox();
 
+        // Starts around a quality-sprinkler-plus radius, then grows aggressively.
         int range = stage switch
         {
-            1 => 115,
-            2 => 165,
-            _ => 220
+            1 => 128,  // 2 tiles
+            2 => 224,  // 3.5 tiles
+            _ => 320   // 5 tiles
         };
 
         int hitCount = stage switch
@@ -649,7 +695,7 @@ internal sealed class CombatService
             range * 2
         );
 
-        int weaponDamage = GetWeaponReferenceDamage();
+        int weaponDamage = GetWeaponReferenceDamage(data);
         float stageBonus = stage switch
         {
             1 => 0f,
@@ -669,11 +715,12 @@ internal sealed class CombatService
             area,
             perHit,
             hitCount,
-            tickGap: 6,
+            tickGap: 4,
             knockback: 0.005f,
             facing: player.FacingDirection,
             effectCenter: new Vector2(area.Center.X, area.Center.Y),
-            effectRadius: stage == 1 ? 80f : stage == 2 ? 120f : 160f
+            effectRadius: stage == 1 ? 132f : stage == 2 ? 194f : 262f,
+            visualStyle: 2
         );
 
         location.localSound("swordswipe");
@@ -719,7 +766,7 @@ internal sealed class CombatService
             _ => 480f
         };
 
-        int weaponDamage = GetWeaponReferenceDamage();
+        int weaponDamage = InfinityBladeReferenceDamage;
         float damageMultiplier = stage switch
         {
             1 => 0.75f,
@@ -727,12 +774,12 @@ internal sealed class CombatService
             _ => 1.05f
         };
 
-        damageMultiplier += progress.TotalPoints * 0.015f;
+        damageMultiplier += progress.TotalPoints * 0.02f;
         int damage = ScaleDamage(weaponDamage, damageMultiplier);
 
         int fxIndex = 0;
 
-        foreach (NPC npc in Game1.currentLocation.characters)
+        foreach (NPC npc in Game1.currentLocation.characters.ToList())
         {
             if (npc is not Monster monster || monster.Health <= 0)
                 continue;
@@ -762,7 +809,7 @@ internal sealed class CombatService
                 radius: Math.Max(34f, Math.Min(monsterBox.Width, monsterBox.Height) * 0.9f),
                 centerAngle: 0.4f + (fxIndex % 4) * 0.85f,
                 sweep: 2.0f,
-                width: 10f,
+                width: 12f + stage * 1.5f,
                 ticks: 15
             );
 
@@ -778,12 +825,12 @@ internal sealed class CombatService
         };
     }
 
-    private bool UseUltimateFootwork(SkillProgress progress, int stage)
+    private bool UseUltimateFootwork(SkillProgress progress, int stage, SaveData data)
     {
         Farmer player = Game1.player;
         GameLocation location = Game1.currentLocation;
         int facing = player.FacingDirection;
-        int weaponDamage = GetWeaponReferenceDamage();
+        int weaponDamage = GetWeaponReferenceDamage(data);
 
         AnimateSwordSkill(player, 20f);
 
@@ -796,7 +843,7 @@ internal sealed class CombatService
             _ => 6f * 64f
         };
 
-        DashForwardPixels(player, facing, maxDistancePixels);
+        DashForwardPixels(player, location, facing, maxDistancePixels);
 
         Vector2 end = player.Position;
         int thickness = stage switch
@@ -807,6 +854,7 @@ internal sealed class CombatService
         };
 
         Rectangle path = BuildPathRectangle(start, end, thickness);
+        ClearSwordCuttableObstacles(location, path);
         float stageBonus = stage switch
         {
             1 => 0f,
@@ -847,15 +895,14 @@ internal sealed class CombatService
             if (hit.Ticks > 0)
                 continue;
 
-            DamageArea(hit.Location, hit.Area, hit.Damage, hit.Knockback);
+            DamageMonstersIgnoringTerrain(hit.Location, hit.Area, hit.Damage, hit.Knockback);
 
-            AddArcFx(
+            AddMultiHitVisual(
                 hit.EffectCenter,
                 hit.EffectRadius,
-                FacingAngle(hit.FacingDirection) + hit.EffectVariant * 0.65f,
-                sweep: 1.95f,
-                width: 10f + (hit.EffectVariant % 2) * 2f,
-                ticks: 13
+                hit.FacingDirection,
+                hit.EffectVariant,
+                hit.VisualStyle
             );
 
             PendingHits.RemoveAt(i);
@@ -877,6 +924,25 @@ internal sealed class CombatService
             wave.Position += wave.Direction * wave.Speed;
             wave.DistanceTravelled += wave.Speed;
             wave.RemainingTicks--;
+
+            if (wave.MaxDistancePixels > 0f
+                && wave.DistanceTravelled >= wave.MaxDistancePixels)
+            {
+                Projectiles.RemoveAt(i);
+                continue;
+            }
+
+            if (wave.StopAtMapWalls && IsMapWall(wave.Location, wave.Position))
+            {
+                Projectiles.RemoveAt(i);
+                continue;
+            }
+
+            if (wave.StopAtSolidObjects && IsSolidProjectileObstacle(wave.Location, wave.Position))
+            {
+                Projectiles.RemoveAt(i);
+                continue;
+            }
 
             if (wave.HitSkipTicks > 0)
             {
@@ -921,7 +987,7 @@ internal sealed class CombatService
                 AddArcFx(
                     wave.Position,
                     wave.VisualRadius * 0.72f,
-                    (float)Math.Atan2(wave.Direction.Y, wave.Direction.X) + MathF.PI,
+                    (float)Math.Atan2(wave.Direction.Y, wave.Direction.X),
                     2.2f,
                     Math.Max(7f, wave.VisualWidth * 0.65f),
                     9
@@ -954,6 +1020,14 @@ internal sealed class CombatService
             if (ArcEffects[i].Ticks <= 0)
                 ArcEffects.RemoveAt(i);
         }
+
+        for (int i = LineEffects.Count - 1; i >= 0; i--)
+        {
+            LineEffects[i].Ticks--;
+
+            if (LineEffects[i].Ticks <= 0)
+                LineEffects.RemoveAt(i);
+        }
     }
 
     private void QueueMultiHit(
@@ -965,18 +1039,18 @@ internal sealed class CombatService
         float knockback,
         int facing,
         Vector2 effectCenter,
-        float effectRadius
+        float effectRadius,
+        int visualStyle = 0
     )
     {
-        DamageArea(location, area, damage, knockback);
+        DamageMonstersIgnoringTerrain(location, area, damage, knockback);
 
-        AddArcFx(
+        AddMultiHitVisual(
             effectCenter,
             effectRadius,
-            FacingAngle(facing) - 0.5f,
-            sweep: 1.95f,
-            width: 11f,
-            ticks: 13
+            facing,
+            variant: 0,
+            visualStyle: visualStyle
         );
 
         for (int i = 1; i < hitCount; i++)
@@ -990,8 +1064,9 @@ internal sealed class CombatService
                 Ticks = i * tickGap,
                 FacingDirection = facing,
                 EffectCenter = effectCenter,
-                EffectRadius = effectRadius + (i % 3 - 1) * 9f,
-                EffectVariant = i
+                EffectRadius = effectRadius,
+                EffectVariant = i,
+                VisualStyle = visualStyle
             });
         }
     }
@@ -1006,14 +1081,28 @@ internal sealed class CombatService
         return weapon is not null;
     }
 
-    private static int GetWeaponReferenceDamage()
+    private static void RememberCurrentSword(SaveData data)
     {
         if (!TryGetEquippedSword(out MeleeWeapon? weapon) || weapon is null)
-            return 1;
+            return;
 
         int min = Math.Max(1, weapon.minDamage.Value);
         int max = Math.Max(min, weapon.maxDamage.Value);
-        return Math.Max(1, (min + max) / 2);
+        data.LastSwordReferenceDamage = Math.Max(1, (min + max) / 2);
+    }
+
+    private static int GetWeaponReferenceDamage(SaveData data)
+    {
+        if (TryGetEquippedSword(out MeleeWeapon? weapon) && weapon is not null)
+        {
+            int min = Math.Max(1, weapon.minDamage.Value);
+            int max = Math.Max(min, weapon.maxDamage.Value);
+            int average = Math.Max(1, (min + max) / 2);
+            data.LastSwordReferenceDamage = average;
+            return average;
+        }
+
+        return Math.Max(1, data.LastSwordReferenceDamage);
     }
 
     private static float SingleHitMultiplier(
@@ -1074,30 +1163,176 @@ internal sealed class CombatService
 
     private static void DashForwardPixels(
         Farmer player,
+        GameLocation location,
         int facing,
         float maxDistancePixels
     )
     {
+        Vector2 direction = DirectionVector(facing);
         Vector2 start = player.Position;
+        const float step = 8f;
 
-        // Safety cap prevents any unexpected infinite movement loop.
+        // Custom dash collision:
+        // - monsters never stop the dash;
+        // - weeds/fiber-like sword-cuttable obstacles don't stop it;
+        // - rocks, trees, solid objects, and map walls do stop it.
         for (int i = 0; i < 512; i++)
         {
-            if (Vector2.Distance(start, player.Position) >= maxDistancePixels)
+            float travelled = Vector2.Distance(start, player.Position);
+            if (travelled >= maxDistancePixels)
                 break;
 
-            Vector2 before = player.Position;
+            float remaining = maxDistancePixels - travelled;
+            Vector2 delta = direction * Math.Min(step, remaining);
+            Vector2 nextPosition = player.Position + delta;
 
-            player.tryToMoveInDirection(
-                facing,
-                isFarmer: true,
-                damagesFarmer: 0,
-                glider: false
+            Rectangle nextBox = player.GetBoundingBox();
+            nextBox.Offset((int)Math.Round(delta.X), (int)Math.Round(delta.Y));
+
+            if (IsHardDashBlocker(location, nextBox))
+                break;
+
+            player.Position = nextPosition;
+        }
+    }
+
+    private static bool IsHardDashBlocker(
+        GameLocation location,
+        Rectangle nextBox
+    )
+    {
+        int minTileX = Math.Max(0, nextBox.Left / 64);
+        int maxTileX = Math.Max(0, (nextBox.Right - 1) / 64);
+        int minTileY = Math.Max(0, nextBox.Top / 64);
+        int maxTileY = Math.Max(0, (nextBox.Bottom - 1) / 64);
+
+        for (int tileX = minTileX; tileX <= maxTileX; tileX++)
+        {
+            for (int tileY = minTileY; tileY <= maxTileY; tileY++)
+            {
+                Vector2 tile = new(tileX, tileY);
+
+                if (IsMapWallTile(location, tileX, tileY))
+                    return true;
+
+                if (location.objects.TryGetValue(tile, out StardewValley.Object? obj)
+                    && !IsSwordCuttableObstacle(obj))
+                {
+                    return true;
+                }
+
+                if (location.terrainFeatures.TryGetValue(tile, out TerrainFeature? terrain)
+                    && terrain is not Grass)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSwordCuttableObstacle(StardewValley.Object obj)
+    {
+        string name = obj.Name ?? "";
+
+        return name.Contains("Weed", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Fiber", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Grass", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMapWall(GameLocation location, Vector2 worldPosition)
+    {
+        int tileX = (int)MathF.Floor(worldPosition.X / 64f);
+        int tileY = (int)MathF.Floor(worldPosition.Y / 64f);
+
+        return IsMapWallTile(location, tileX, tileY);
+    }
+
+    private static bool IsMapWallTile(
+        GameLocation location,
+        int tileX,
+        int tileY
+    )
+    {
+        var backLayer = location.Map.GetLayer("Back");
+
+        if (backLayer is null
+            || tileX < 0
+            || tileY < 0
+            || tileX >= backLayer.LayerWidth
+            || tileY >= backLayer.LayerHeight)
+        {
+            return true;
+        }
+
+        if (backLayer.Tiles[tileX, tileY] is null)
+            return true;
+
+        var buildingsLayer = location.Map.GetLayer("Buildings");
+
+        if (buildingsLayer is not null
+            && tileX < buildingsLayer.LayerWidth
+            && tileY < buildingsLayer.LayerHeight
+            && buildingsLayer.Tiles[tileX, tileY] is not null
+            && location.doesTileHaveProperty(
+                tileX,
+                tileY,
+                "Passable",
+                "Buildings"
+            ) is null)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsSolidProjectileObstacle(
+        GameLocation location,
+        Vector2 worldPosition
+    )
+    {
+        int tileX = (int)MathF.Floor(worldPosition.X / 64f);
+        int tileY = (int)MathF.Floor(worldPosition.Y / 64f);
+        Vector2 tile = new(tileX, tileY);
+
+        if (location.objects.TryGetValue(tile, out StardewValley.Object? obj))
+            return !IsSwordCuttableObstacle(obj);
+
+        if (location.terrainFeatures.TryGetValue(tile, out TerrainFeature? terrain))
+            return terrain is not Grass;
+
+        return false;
+    }
+
+    private static void ClearSwordCuttableObstacles(
+        GameLocation location,
+        Rectangle path
+    )
+    {
+        List<Vector2> remove = new();
+
+        foreach (Vector2 tile in location.objects.Keys)
+        {
+            StardewValley.Object obj = location.objects[tile];
+
+            if (!IsSwordCuttableObstacle(obj))
+                continue;
+
+            Rectangle tileBox = new(
+                (int)tile.X * 64,
+                (int)tile.Y * 64,
+                64,
+                64
             );
 
-            if (player.Position == before)
-                break;
+            if (tileBox.Intersects(path))
+                remove.Add(tile);
         }
+
+        foreach (Vector2 tile in remove)
+            location.objects.Remove(tile);
     }
 
     private static Rectangle BuildFrontArea(Farmer player, int range, int width)
@@ -1157,14 +1392,48 @@ internal sealed class CombatService
         );
     }
 
-    private static void DamageAreaForcedCritical(
+    private static void DamageMonstersIgnoringTerrain(
         GameLocation location,
         Rectangle area,
         int damage,
         float knockback
     )
     {
-        location.damageMonster(
+        // Target monsters directly by their own hitboxes. This avoids any
+        // terrain/rock between the farmer and the monster affecting the hit.
+        foreach (NPC npc in location.characters.ToList())
+        {
+            if (npc is not Monster monster || monster.Health <= 0)
+                continue;
+
+            Rectangle monsterBox = monster.GetBoundingBox();
+
+            if (!area.Intersects(monsterBox))
+                continue;
+
+            location.damageMonster(
+                monsterBox,
+                damage,
+                damage,
+                isBomb: false,
+                knockBackModifier: knockback,
+                addedPrecision: 0,
+                critChance: 0f,
+                critMultiplier: 1f,
+                triggerMonsterInvincibleTimer: false,
+                who: Game1.player
+            );
+        }
+    }
+
+    private static bool DamageAreaForcedCritical(
+        GameLocation location,
+        Rectangle area,
+        int damage,
+        float knockback
+    )
+    {
+        return location.damageMonster(
             area,
             damage,
             damage,
@@ -1182,6 +1451,97 @@ internal sealed class CombatService
     // ---------------------------------------------------------------------
     // Visual FX
     // ---------------------------------------------------------------------
+
+    private void AddMultiHitVisual(
+        Vector2 center,
+        float baseRadius,
+        int facing,
+        int variant,
+        int visualStyle
+    )
+    {
+        Vector2 direction = DirectionVector(facing);
+        Vector2 perpendicular = new(-direction.Y, direction.X);
+
+        if (visualStyle == 1)
+        {
+            // Basic C: overlapping frontal combo slashes, not a circular spin.
+            float side = ((variant % 3) - 1) * 18f;
+            float forward = (variant % 2 == 0 ? 8f : -6f);
+            Vector2 fxCenter = center + perpendicular * side + direction * forward;
+
+            float angle = FacingAngle(facing)
+                + (variant % 2 == 0 ? -0.85f : 0.85f)
+                + ((variant / 2) % 2 == 0 ? 0.10f : -0.10f);
+
+            AddArcFx(
+                fxCenter,
+                radius: baseRadius + (variant % 3) * 7f,
+                centerAngle: angle,
+                sweep: 2.18f,
+                width: 12.5f + (variant % 2) * 2f,
+                ticks: 11
+            );
+            return;
+        }
+
+        if (visualStyle == 2)
+        {
+            // Ohgi C: dense all-around sword storm. Multiple large crossing arcs
+            // are emitted per hit so it reads as rapid surrounding slashes.
+            int slashCount = variant % 3 == 0 ? 3 : 2;
+
+            for (int j = 0; j < slashCount; j++)
+            {
+                float seed = variant * 1.27f + j * 2.05f;
+                float angle = seed + (variant % 2 == 0 ? 0.35f : -0.35f);
+                float offsetRadius = baseRadius * (0.12f + 0.10f * j);
+
+                Vector2 fxCenter = center + new Vector2(
+                    MathF.Cos(seed) * offsetRadius,
+                    MathF.Sin(seed) * offsetRadius
+                );
+
+                AddArcFx(
+                    fxCenter,
+                    radius: baseRadius * (0.72f + 0.08f * ((variant + j) % 3)),
+                    centerAngle: angle,
+                    sweep: 2.35f,
+                    width: 18f + (variant % 3) * 2.5f + j * 1.5f,
+                    ticks: 13
+                );
+            }
+
+            return;
+        }
+
+        // Default path multi-hit style used by dash attacks.
+        AddArcFx(
+            center,
+            baseRadius + (variant % 3 - 1) * 9f,
+            FacingAngle(facing) + (variant % 2 == 0 ? -0.55f : 0.55f),
+            sweep: 2.0f,
+            width: 10f + (variant % 2) * 2f,
+            ticks: 12
+        );
+    }
+
+    private void AddLineFx(
+        Vector2 start,
+        Vector2 end,
+        float width,
+        int ticks
+    )
+    {
+        LineEffects.Add(new LineFx
+        {
+            Start = start,
+            End = end,
+            Width = width,
+            Ticks = ticks,
+            MaxTicks = ticks
+        });
+    }
 
     private void AddDashSlashFx(Vector2 start, Vector2 end, int facing, int count)
     {
@@ -1358,6 +1718,51 @@ internal sealed class CombatService
         }
     }
 
+    private static void DrawCrescent(
+        SpriteBatch b,
+        Vector2 center,
+        float radius,
+        float centerAngle,
+        float sweep,
+        float maxWidth,
+        Color color,
+        int segments
+    )
+    {
+        float startAngle = centerAngle - sweep / 2f;
+
+        Vector2 previous = center + new Vector2(
+            MathF.Cos(startAngle),
+            MathF.Sin(startAngle)
+        ) * radius;
+
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = i / (float)segments;
+            float angle = startAngle + sweep * t;
+
+            Vector2 current = center + new Vector2(
+                MathF.Cos(angle),
+                MathF.Sin(angle)
+            ) * radius;
+
+            // A true crescent tapers at both ends and is thickest in the middle.
+            float middleT = (i - 0.5f) / segments;
+            float taper = MathF.Sin(MathF.PI * Math.Clamp(middleT, 0f, 1f));
+            float width = Math.Max(1.25f, maxWidth * MathF.Pow(taper, 0.72f));
+
+            DrawLine(
+                b,
+                previous,
+                current,
+                width,
+                color
+            );
+
+            previous = current;
+        }
+    }
+
     private static void DrawLine(
         SpriteBatch b,
         Vector2 start,
@@ -1399,6 +1804,7 @@ internal sealed class CombatService
         public Vector2 EffectCenter { get; set; }
         public float EffectRadius { get; set; }
         public int EffectVariant { get; set; }
+        public int VisualStyle { get; set; }
     }
 
     private sealed class SwordWave
@@ -1419,10 +1825,22 @@ internal sealed class CombatService
         public float DistanceTravelled { get; set; }
         public float DistanceFalloff { get; set; }
         public float PierceFalloff { get; set; }
+        public float MaxDistancePixels { get; set; }
+        public bool StopAtMapWalls { get; set; }
+        public bool StopAtSolidObjects { get; set; }
 
         public float VisualRadius { get; set; } = 48f;
         public float VisualWidth { get; set; } = 13f;
         public float VisualSweep { get; set; } = 2.45f;
+    }
+
+    private sealed class LineFx
+    {
+        public Vector2 Start { get; set; }
+        public Vector2 End { get; set; }
+        public float Width { get; set; }
+        public int Ticks { get; set; }
+        public int MaxTicks { get; set; }
     }
 
     private sealed class ArcFx
