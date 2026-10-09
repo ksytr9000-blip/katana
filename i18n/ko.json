@@ -1,4 +1,9 @@
 {
+  "gmcm.language.section": "언어",
+  "gmcm.language.name": "모드 언어",
+  "gmcm.language.tip": "검술 마스터리에서 사용할 언어를 선택합니다. 기본값: 영어.",
+  "gmcm.language.english": "English",
+  "gmcm.language.korean": "한국어",
   "item.ohgi-book.name": "오의 비책",
   "item.ohgi-book.description": "오의를 해방하는 비법서. 손에 들고 행동 버튼으로 사용한다.",
   "item.insight-drop.name": "깨달음의 물방울",

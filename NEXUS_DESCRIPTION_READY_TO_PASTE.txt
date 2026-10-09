@@ -90,7 +90,7 @@ LANGUAGES
 • English — default
 • Korean — included
 
-The mod automatically follows the Stardew Valley language setting. No separate language option is needed.
+English is the default language. You can switch Sword Mastery to Korean from Generic Mod Config Menu.
 
 COMPATIBILITY
 Developed for Stardew Valley 1.6.x with SMAPI.
@@ -125,7 +125,7 @@ Please include:
 • 영어 / 한국어 지원
 • Vortex 설치 지원
 
-언어는 별도의 선택 메뉴가 아니라 스타듀밸리의 현재 언어 설정을 자동으로 따라갑니다.
+영어가 기본 언어이며 Generic Mod Config Menu에서 한국어로 변경할 수 있습니다.
 
 필수
 • SMAPI 4.3.0+

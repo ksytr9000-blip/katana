@@ -35,8 +35,14 @@ internal sealed class ModEntry : Mod
 
     public override void Entry(IModHelper helper)
     {
-        I18n.Init(helper);
         Config = helper.ReadConfig<ModConfig>();
+
+        // Sword Mastery language is independent from Stardew Valley's
+        // language. English is the default until changed in GMCM.
+        I18n.Init(
+            helper,
+            () => Config.Language
+        );
         Progression = new ProgressionService(Config);
         Skills = new SkillService();
         Combat = new CombatService(Monitor);
@@ -182,6 +188,49 @@ internal sealed class ModEntry : Mod
             mod: ModManifest,
             reset: () => Config = new ModConfig(),
             save: () => Helper.WriteConfig(Config)
+        );
+
+        gmcm.AddSectionTitle(
+            mod: ModManifest,
+            text: () => I18n.Get("gmcm.language.section")
+        );
+
+        gmcm.AddTextOption(
+            mod: ModManifest,
+            getValue: () => Config.Language,
+            setValue: value =>
+            {
+                Config.Language =
+                    string.Equals(
+                        value,
+                        "Korean",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                        ? "Korean"
+                        : "English";
+
+                // Object and quest strings are injected into game data,
+                // so clear those caches when the language changes.
+                Helper.GameContent.InvalidateCache(
+                    "Data/Objects"
+                );
+
+                Helper.GameContent.InvalidateCache(
+                    "Data/Quests"
+                );
+            },
+            name: () => I18n.Get("gmcm.language.name"),
+            tooltip: () => I18n.Get("gmcm.language.tip"),
+            allowedValues: new[]
+            {
+                "English",
+                "Korean"
+            },
+            formatAllowedValue: value =>
+                value == "Korean"
+                    ? I18n.Get("gmcm.language.korean")
+                    : I18n.Get("gmcm.language.english"),
+            fieldId: "Language"
         );
 
         gmcm.AddSectionTitle(

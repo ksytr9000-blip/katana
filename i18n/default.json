@@ -1,4 +1,9 @@
 {
+  "gmcm.language.section": "Language",
+  "gmcm.language.name": "Mod Language",
+  "gmcm.language.tip": "Choose the language used by Sword Mastery. Default: English.",
+  "gmcm.language.english": "English",
+  "gmcm.language.korean": "Korean",
   "item.ohgi-book.name": "Secret Art Manual",
   "item.ohgi-book.description": "A secret manual that unlocks Secret Arts. Hold it and use the action button.",
   "item.insight-drop.name": "Drop of Enlightenment",

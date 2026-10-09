@@ -4,6 +4,9 @@ namespace SwordMastery;
 
 internal sealed class ModConfig
 {
+    // Mod display language. This is intentionally independent from the
+    // Stardew Valley game language.
+    public string Language { get; set; } = "English";
     public bool ShowHud { get; set; } = true;
     public int HudX { get; set; } = 24;
     public int HudY { get; set; } = 24;

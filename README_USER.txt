@@ -13,7 +13,7 @@ Languages:
 - English (default)
 - Korean
 
-The mod automatically follows the Stardew Valley language setting.
+English is the default language. Korean can be selected from Generic Mod Config Menu.
 
 Default keys:
 K   Open Sword Mastery menu
