@@ -18,27 +18,40 @@ jobs:
           dotnet_version: 6.0.x
           force_build_with_dotnet_version: true
 
+      - name: Read mod version
+        shell: bash
+        run: |
+          VERSION=$(python3 -c 'import json; print(json.load(open("manifest.json", encoding="utf-8"))["Version"])')
+          echo "MOD_VERSION=$VERSION" >> "$GITHUB_ENV"
+
       - name: Restore
         run: dotnet restore SwordMastery.csproj
 
       - name: Build
         run: dotnet build SwordMastery.csproj --configuration Release --no-restore
 
-      - name: Make install folder
+      - name: Make Nexus / Vortex package
         shell: bash
         run: |
           set -e
+          rm -rf package
           mkdir -p package/SwordMastery
+
           cp bin/Release/net6.0/SwordMastery.dll package/SwordMastery/
           cp manifest.json package/SwordMastery/
           cp -r assets package/SwordMastery/
           cp -r i18n package/SwordMastery/
-          cd package
-          zip -r ../SwordMastery-Install.zip SwordMastery
 
-      - name: Upload Android-PC install ZIP
+          if [ -f README_USER.txt ]; then
+            cp README_USER.txt package/SwordMastery/
+          fi
+
+          cd package
+          zip -r "../SwordMastery-${MOD_VERSION}-Nexus-Vortex.zip" SwordMastery
+
+      - name: Upload Nexus / Vortex ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: SwordMastery-Install
-          path: SwordMastery-Install.zip
+          name: SwordMastery-Nexus-Vortex-${{ env.MOD_VERSION }}
+          path: SwordMastery-${{ env.MOD_VERSION }}-Nexus-Vortex.zip
           if-no-files-found: error
