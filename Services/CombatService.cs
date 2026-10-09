@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Reflection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
@@ -883,16 +884,10 @@ internal sealed class CombatService
             //
             // Use a vanilla bomb-type 99,999 finisher so the game's normal
             // death/drop handling is preserved as much as possible.
+            bool isArmoredBug = IsArmoredBugMonster(monster);
             bool specialFinisherTarget =
                 monster is Mummy
-                || (
-                    monster is Bug
-                    && string.Equals(
-                        monster.Name,
-                        "Armored Bug",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
+                || isArmoredBug
                 || monster is RockCrab;
 
             if (specialFinisherTarget
@@ -900,34 +895,57 @@ internal sealed class CombatService
             {
                 Rectangle specialMonsterBox = monster.GetBoundingBox();
 
-                // Multiple passes cover revive / armor / shell state transitions.
-                for (int finishPass = 0; finishPass < 3; finishPass++)
+                // Armored Bug rejects normal damage based on its internal armor
+                // flag AND the player's currently-held weapon enchantment.
+                // Temporarily clear the armor flag so 검술의 극 works regardless
+                // of whether the player is holding a weapon, tool, or nothing.
+                bool armorTemporarilyDisabled = false;
+
+                if (isArmoredBug)
+                    armorTemporarilyDisabled = TrySetArmoredBugState(monster, false);
+
+                try
                 {
-                    if (!Game1.currentLocation.characters.Contains(monster))
-                        break;
-
-                    bool previousIgnoreLos = monster.ignoreDamageLOS.Value;
-
-                    try
+                    for (int finishPass = 0; finishPass < 3; finishPass++)
                     {
-                        monster.ignoreDamageLOS.Value = true;
+                        if (!Game1.currentLocation.characters.Contains(monster))
+                            break;
 
-                        Game1.currentLocation.damageMonster(
-                            specialMonsterBox,
-                            99999,
-                            99999,
-                            isBomb: true,
-                            knockBackModifier: 0f,
-                            addedPrecision: 999,
-                            critChance: 1f,
-                            critMultiplier: 2f,
-                            triggerMonsterInvincibleTimer: false,
-                            who: Game1.player
-                        );
+                        bool previousIgnoreLos = monster.ignoreDamageLOS.Value;
+
+                        try
+                        {
+                            monster.ignoreDamageLOS.Value = true;
+
+                            Game1.currentLocation.damageMonster(
+                                specialMonsterBox,
+                                99999,
+                                99999,
+                                // Armored Bug explicitly rejects bomb damage while armored.
+                                // Its armor is disabled above, so use a normal hit for it.
+                                // Mummy/Rock Crab keep the bomb-style finisher.
+                                isBomb: !isArmoredBug,
+                                knockBackModifier: 0f,
+                                addedPrecision: 999,
+                                critChance: 1f,
+                                critMultiplier: 2f,
+                                triggerMonsterInvincibleTimer: false,
+                                who: Game1.player
+                            );
+                        }
+                        finally
+                        {
+                            monster.ignoreDamageLOS.Value = previousIgnoreLos;
+                        }
                     }
-                    finally
+                }
+                finally
+                {
+                    // Only restore armor if the bug survived and is still present.
+                    if (armorTemporarilyDisabled
+                        && Game1.currentLocation.characters.Contains(monster))
                     {
-                        monster.ignoreDamageLOS.Value = previousIgnoreLos;
+                        TrySetArmoredBugState(monster, true);
                     }
                 }
             }
@@ -1746,6 +1764,149 @@ internal sealed class CombatService
             triggerMonsterInvincibleTimer: false,
             who: Game1.player
         );
+    }
+
+    private static bool IsArmoredBugMonster(Monster monster)
+    {
+        if (monster is not Bug)
+            return false;
+
+        if (string.Equals(
+            monster.Name,
+            "Armored Bug",
+            StringComparison.OrdinalIgnoreCase
+        ))
+        {
+            return true;
+        }
+
+        return TryReadArmoredBugState(monster, out bool armored) && armored;
+    }
+
+    private static bool TryReadArmoredBugState(
+        Monster monster,
+        out bool armored
+    )
+    {
+        armored = false;
+
+        Type type = monster.GetType();
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        string[] names =
+        {
+            "isArmoredBug",
+            "IsArmoredBug",
+            "isArmored",
+            "IsArmored"
+        };
+
+        foreach (string name in names)
+        {
+            object? holder =
+                type.GetField(name, flags)?.GetValue(monster)
+                ?? type.GetProperty(name, flags)?.GetValue(monster);
+
+            if (holder is bool direct)
+            {
+                armored = direct;
+                return true;
+            }
+
+            if (holder is null)
+                continue;
+
+            PropertyInfo? valueProperty = holder
+                .GetType()
+                .GetProperty(
+                    "Value",
+                    BindingFlags.Instance
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                );
+
+            if (valueProperty?.GetValue(holder) is bool nested)
+            {
+                armored = nested;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TrySetArmoredBugState(
+        Monster monster,
+        bool armored
+    )
+    {
+        if (monster is not Bug)
+            return false;
+
+        Type type = monster.GetType();
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        string[] names =
+        {
+            "isArmoredBug",
+            "IsArmoredBug",
+            "isArmored",
+            "IsArmored"
+        };
+
+        foreach (string name in names)
+        {
+            FieldInfo? field = type.GetField(name, flags);
+            PropertyInfo? property = type.GetProperty(name, flags);
+
+            object? holder =
+                field?.GetValue(monster)
+                ?? property?.GetValue(monster);
+
+            if (holder is null)
+                continue;
+
+            if (holder is bool)
+            {
+                if (field is not null && !field.IsInitOnly)
+                {
+                    field.SetValue(monster, armored);
+                    return true;
+                }
+
+                if (property?.CanWrite == true)
+                {
+                    property.SetValue(monster, armored);
+                    return true;
+                }
+
+                continue;
+            }
+
+            PropertyInfo? valueProperty = holder
+                .GetType()
+                .GetProperty(
+                    "Value",
+                    BindingFlags.Instance
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                );
+
+            if (valueProperty?.CanWrite == true
+                && valueProperty.PropertyType == typeof(bool))
+            {
+                valueProperty.SetValue(holder, armored);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool DamageSingleMonsterIgnoringTerrain(

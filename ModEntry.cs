@@ -151,7 +151,7 @@ internal sealed class ModEntry : Mod
                 quests[OhgiQuestId] =
                     "Basic/[오의]새로운 경지를 깨우칠 것 같다."
                     + "/새로운 경지가 손에 잡힐 듯하다. 실전 속에서 감각을 완성해 보자."
-                    + "/목표 - 어둠의 해골 사냥: 0／30"
+                    + "/목표 - 귀신들린 해골(채석장 광산) 사냥: 0／30"
                     + "/null/-1/0/-1/false";
 
                 quests[UltimateQuestId] =
@@ -474,7 +474,7 @@ internal sealed class ModEntry : Mod
                     DebugCompleteOhgiQuest();
             },
             name: () => "[퀘스트] 오의 퀘스트 즉시 완료",
-            tooltip: () => "어둠의 해골 30마리 진행도를 채우고 오의 비책 보상을 지급합니다.",
+            tooltip: () => "귀신들린 해골(채석장 광산) 30마리 진행도를 채우고 오의 비책 보상을 지급합니다.",
             fieldId: "DebugCompleteOhgiQuest"
         );
 
@@ -1045,7 +1045,7 @@ internal sealed class ModEntry : Mod
             return;
 
         string objective =
-            $"목표 - 어둠의 해골 사냥: {Math.Min(30, Data.OhgiSkullKills)}/30";
+            $"목표 - 귀신들린 해골(채석장 광산) 사냥: {Math.Min(30, Data.OhgiSkullKills)}/30";
 
         SetQuestObjective(
             OhgiQuestId,
