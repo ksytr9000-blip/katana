@@ -152,13 +152,13 @@ internal sealed class ModEntry : Mod
                     "Basic/[오의]새로운 경지를 깨우칠 것 같다."
                     + "/새로운 경지가 손에 잡힐 듯하다. 실전 속에서 감각을 완성해 보자."
                     + "/목표 - 귀신들린 해골(채석장 광산) 사냥: 0／30"
-                    + "/null/-1/0/-1/false";
+                    + "/null/-1/1/오의 비책/false";
 
                 quests[UltimateQuestId] =
                     "Basic/[극의]검술의 극에 달할 수 있을 것 같다."
                     + "/검술의 극에 닿기 위해서는 용을 넘어 그 힘까지 받아들여야 한다."
                     + "/목표 1 - 용 사냥: 0／50 | 목표 2 - 용의 보주: 0／10"
-                    + "/null/-1/0/-1/false";
+                    + "/null/-1/1/깨달음의 물방울/false";
             });
         }
     }
@@ -739,7 +739,15 @@ internal sealed class ModEntry : Mod
         if (!Context.IsWorldReady)
             return;
 
-        if (Data.OhgiQuestAvailable && !Data.OhgiQuestCompleted)
+        if (Data.OhgiRewardReady)
+        {
+            EnsureQuestInJournal(OhgiQuestId);
+            MarkQuestReadyForJournalReward(
+                OhgiQuestId,
+                "오의 비책"
+            );
+        }
+        else if (Data.OhgiQuestAvailable && !Data.OhgiQuestCompleted)
         {
             if (!Data.OhgiQuestStarted)
                 StartOhgiUnlockQuest();
@@ -750,7 +758,15 @@ internal sealed class ModEntry : Mod
             }
         }
 
-        if (Data.UltimateQuestAvailable && !Data.UltimateQuestCompleted)
+        if (Data.UltimateRewardReady)
+        {
+            EnsureQuestInJournal(UltimateQuestId);
+            MarkQuestReadyForJournalReward(
+                UltimateQuestId,
+                "깨달음의 물방울"
+            );
+        }
+        else if (Data.UltimateQuestAvailable && !Data.UltimateQuestCompleted)
         {
             if (!Data.UltimateQuestStarted)
                 StartUltimateUnlockQuest();
@@ -1070,8 +1086,12 @@ internal sealed class ModEntry : Mod
 
     private void CheckUltimateQuestCompletion()
     {
-        if (!Data.UltimateQuestStarted || Data.UltimateQuestCompleted)
+        if (!Data.UltimateQuestStarted
+            || Data.UltimateQuestCompleted
+            || Data.UltimateRewardReady)
+        {
             return;
+        }
 
         if (Data.UltimateDragonKills < 50)
             return;
@@ -1084,19 +1104,19 @@ internal sealed class ModEntry : Mod
 
     private void CompleteOhgiUnlockQuest()
     {
-        if (Data.OhgiQuestCompleted)
+        if (Data.OhgiQuestCompleted || Data.OhgiRewardReady)
             return;
 
         Data.OhgiSkullKills = 30;
-        Data.OhgiQuestCompleted = true;
-        Data.OhgiQuestAvailable = false;
+        Data.OhgiRewardReady = true;
 
-        CompleteQuestInJournal(OhgiQuestId);
-
-        GiveItemOrDrop($"(O){OhgiSecretBookId}", 1);
+        MarkQuestReadyForJournalReward(
+            OhgiQuestId,
+            "오의 비책"
+        );
 
         Game1.addHUDMessage(new HUDMessage(
-            "오의 해방 퀘스트 완료! 오의 비책을 얻었습니다.",
+            "오의 해방 퀘스트 완료! 일지에서 보상을 수령하세요.",
             HUDMessage.newQuest_type
         ));
         Game1.playSound("questcomplete");
@@ -1104,7 +1124,7 @@ internal sealed class ModEntry : Mod
 
     private void CompleteUltimateUnlockQuest(bool force)
     {
-        if (Data.UltimateQuestCompleted)
+        if (Data.UltimateQuestCompleted || Data.UltimateRewardReady)
             return;
 
         if (!force)
@@ -1116,22 +1136,211 @@ internal sealed class ModEntry : Mod
                 return;
         }
 
-        // The 10 orbs are consumed as their power is absorbed into the player.
+        // Consume the 10 Dragon Orbs at objective completion.
+        // The unlock item itself is claimed later through the journal reward box.
         RemoveInventoryItem($"(O){DragonOrbId}", 10);
 
         Data.UltimateDragonKills = 50;
-        Data.UltimateQuestCompleted = true;
-        Data.UltimateQuestAvailable = false;
+        Data.UltimateRewardReady = true;
 
-        CompleteQuestInJournal(UltimateQuestId);
         PlayDragonOrbAbsorptionEffect();
 
-        GiveItemOrDrop($"(O){InsightDropId}", 1);
+        MarkQuestReadyForJournalReward(
+            UltimateQuestId,
+            "깨달음의 물방울"
+        );
 
         Game1.addHUDMessage(new HUDMessage(
-            "용의 보주의 힘이 몸에 스며들었다. 깨달음의 물방울을 얻었습니다.",
+            "용의 보주의 힘이 몸에 스며들었다. 일지에서 보상을 수령하세요.",
             HUDMessage.newQuest_type
         ));
+    }
+
+    private void MarkQuestReadyForJournalReward(
+        string questId,
+        string rewardName
+    )
+    {
+        EnsureQuestInJournal(questId);
+
+        object? quest = FindQuestInJournal(questId);
+        if (quest is null)
+            return;
+
+        // A 1g token makes the vanilla reward chest clickable.
+        // We immediately subtract that 1g when the claim is detected; the actual
+        // reward is the custom unlock item named in rewardDescription.
+        TrySetIntLikeMember(quest, "moneyReward", 1);
+        TrySetStringLikeMember(quest, "rewardDescription", rewardName);
+
+        MethodInfo? questComplete =
+            quest.GetType().GetMethod(
+                "questComplete",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: Type.EmptyTypes,
+                modifiers: null
+            )
+            ?? quest.GetType().GetMethod(
+                "QuestComplete",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: Type.EmptyTypes,
+                modifiers: null
+            );
+
+        if (questComplete is not null)
+        {
+            try
+            {
+                questComplete.Invoke(quest, null);
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log(
+                    $"Could not mark quest '{questId}' complete for journal reward: {ex.Message}",
+                    LogLevel.Error
+                );
+
+                TrySetBoolLikeMember(quest, "completed", true);
+            }
+        }
+        else
+        {
+            TrySetBoolLikeMember(quest, "completed", true);
+        }
+
+        Game1.dayTimeMoneyBox.questsDirty = true;
+    }
+
+    private void HandleJournalRewardClaims()
+    {
+        if (Data.OhgiRewardReady
+            && WasJournalRewardClaimed(OhgiQuestId))
+        {
+            RemoveJournalRewardTokenGold();
+
+            Data.OhgiRewardReady = false;
+            Data.OhgiQuestCompleted = true;
+            Data.OhgiQuestAvailable = false;
+            Data.OhgiRewardDeliveryPending = true;
+
+            if (TryDeliverPendingQuestReward(
+                    $"(O){OhgiSecretBookId}",
+                    "오의 비책"
+                ))
+            {
+                Data.OhgiRewardDeliveryPending = false;
+            }
+            else
+            {
+                Game1.addHUDMessage(new HUDMessage(
+                    "인벤토리가 가득 찼습니다. 공간이 생기면 오의 비책이 자동 지급됩니다.",
+                    HUDMessage.error_type
+                ));
+            }
+        }
+
+        if (Data.UltimateRewardReady
+            && WasJournalRewardClaimed(UltimateQuestId))
+        {
+            RemoveJournalRewardTokenGold();
+
+            Data.UltimateRewardReady = false;
+            Data.UltimateQuestCompleted = true;
+            Data.UltimateQuestAvailable = false;
+            Data.UltimateRewardDeliveryPending = true;
+
+            if (TryDeliverPendingQuestReward(
+                    $"(O){InsightDropId}",
+                    "깨달음의 물방울"
+                ))
+            {
+                Data.UltimateRewardDeliveryPending = false;
+            }
+            else
+            {
+                Game1.addHUDMessage(new HUDMessage(
+                    "인벤토리가 가득 찼습니다. 공간이 생기면 깨달음의 물방울이 자동 지급됩니다.",
+                    HUDMessage.error_type
+                ));
+            }
+        }
+
+        if (Data.OhgiRewardDeliveryPending
+            && TryDeliverPendingQuestReward(
+                $"(O){OhgiSecretBookId}",
+                "오의 비책"
+            ))
+        {
+            Data.OhgiRewardDeliveryPending = false;
+        }
+
+        if (Data.UltimateRewardDeliveryPending
+            && TryDeliverPendingQuestReward(
+                $"(O){InsightDropId}",
+                "깨달음의 물방울"
+            ))
+        {
+            Data.UltimateRewardDeliveryPending = false;
+        }
+    }
+
+    private bool WasJournalRewardClaimed(string questId)
+    {
+        object? quest = FindQuestInJournal(questId);
+
+        // Vanilla removes a completed quest after the reward is claimed and the
+        // player leaves its journal page.
+        if (quest is null)
+            return true;
+
+        if (TryReadIntLikeMember(
+                quest,
+                "moneyReward",
+                out int reward
+            )
+            && reward <= 0)
+        {
+            return true;
+        }
+
+        if (TryReadBoolLikeMember(
+                quest,
+                "destroy",
+                out bool destroy
+            )
+            && destroy)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static void RemoveJournalRewardTokenGold()
+    {
+        if (Game1.player.Money > 0)
+            Game1.player.Money -= 1;
+    }
+
+    private static bool TryDeliverPendingQuestReward(
+        string qualifiedItemId,
+        string displayName
+    )
+    {
+        Item item = ItemRegistry.Create(qualifiedItemId);
+
+        if (!Game1.player.addItemToInventoryBool(item))
+            return false;
+
+        Game1.addHUDMessage(new HUDMessage(
+            $"{displayName}을(를) 받았습니다.",
+            HUDMessage.newQuest_type
+        ));
+        Game1.playSound("coin");
+
+        return true;
     }
 
     private void TryDropDragonOrb(GameLocation location, Vector2 position)
@@ -1168,8 +1377,12 @@ internal sealed class ModEntry : Mod
 
     private void UpdateOhgiQuestObjective()
     {
-        if (!Data.OhgiQuestStarted || Data.OhgiQuestCompleted)
+        if (!Data.OhgiQuestStarted
+            || Data.OhgiQuestCompleted
+            || Data.OhgiRewardReady)
+        {
             return;
+        }
 
         string objective =
             $"목표 - 귀신들린 해골(채석장 광산) 사냥: {Math.Min(30, Data.OhgiSkullKills)}/30";
@@ -1188,8 +1401,12 @@ internal sealed class ModEntry : Mod
 
     private void UpdateUltimateQuestObjective()
     {
-        if (!Data.UltimateQuestStarted || Data.UltimateQuestCompleted)
+        if (!Data.UltimateQuestStarted
+            || Data.UltimateQuestCompleted
+            || Data.UltimateRewardReady)
+        {
             return;
+        }
 
         int orbs = Math.Min(
             10,
@@ -1468,6 +1685,146 @@ internal sealed class ModEntry : Mod
             "description",
             progressDescription
         );
+    }
+
+    private static bool TryReadIntLikeMember(
+        object target,
+        string memberName,
+        out int value
+    )
+    {
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        object? raw =
+            target.GetType().GetField(memberName, flags)?.GetValue(target)
+            ?? target.GetType().GetProperty(memberName, flags)?.GetValue(target);
+
+        return TryReadIntLikeValue(raw, out value);
+    }
+
+    private static bool TryReadBoolLikeMember(
+        object target,
+        string memberName,
+        out bool value
+    )
+    {
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        object? raw =
+            target.GetType().GetField(memberName, flags)?.GetValue(target)
+            ?? target.GetType().GetProperty(memberName, flags)?.GetValue(target);
+
+        return TryReadBoolLikeValue(raw, out value);
+    }
+
+    private static bool TrySetIntLikeMember(
+        object target,
+        string memberName,
+        int value
+    )
+    {
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        FieldInfo? field = target.GetType().GetField(memberName, flags);
+        if (field is not null)
+        {
+            if (field.FieldType == typeof(int))
+            {
+                field.SetValue(target, value);
+                return true;
+            }
+
+            if (TrySetScalarNetValue(field.GetValue(target), value))
+                return true;
+        }
+
+        PropertyInfo? property = target.GetType().GetProperty(memberName, flags);
+        if (property is not null)
+        {
+            if (property.PropertyType == typeof(int) && property.CanWrite)
+            {
+                property.SetValue(target, value);
+                return true;
+            }
+
+            if (TrySetScalarNetValue(property.GetValue(target), value))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TrySetBoolLikeMember(
+        object target,
+        string memberName,
+        bool value
+    )
+    {
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        FieldInfo? field = target.GetType().GetField(memberName, flags);
+        if (field is not null)
+        {
+            if (field.FieldType == typeof(bool))
+            {
+                field.SetValue(target, value);
+                return true;
+            }
+
+            if (TrySetScalarNetValue(field.GetValue(target), value))
+                return true;
+        }
+
+        PropertyInfo? property = target.GetType().GetProperty(memberName, flags);
+        if (property is not null)
+        {
+            if (property.PropertyType == typeof(bool) && property.CanWrite)
+            {
+                property.SetValue(target, value);
+                return true;
+            }
+
+            if (TrySetScalarNetValue(property.GetValue(target), value))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TrySetScalarNetValue<T>(
+        object? target,
+        T value
+    )
+    {
+        if (target is null)
+            return false;
+
+        PropertyInfo? valueProperty = target.GetType().GetProperty(
+            "Value",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+
+        if (valueProperty is null
+            || !valueProperty.CanWrite
+            || valueProperty.PropertyType != typeof(T))
+        {
+            return false;
+        }
+
+        valueProperty.SetValue(target, value);
+        return true;
     }
 
     private static string? ReadStringLikeValue(object? value)
@@ -1856,6 +2213,7 @@ internal sealed class ModEntry : Mod
             return;
 
         Combat.Update(Data);
+        HandleJournalRewardClaims();
 
         if (!e.IsMultipleOf(15))
             return;

@@ -36,9 +36,20 @@ internal sealed class SaveData
     public bool OhgiQuestCompleted { get; set; }
     public int OhgiSkullKills { get; set; }
 
+    // Journal reward state.
+    // RewardReady = objectives are complete and the player must claim the reward
+    // from the vanilla journal reward box.
+    // RewardDeliveryPending = the journal reward was claimed, but the inventory
+    // was full; the item will be inserted automatically once a slot is available.
+    public bool OhgiRewardReady { get; set; }
+    public bool OhgiRewardDeliveryPending { get; set; }
+
     public bool UltimateQuestStarted { get; set; }
     public bool UltimateQuestCompleted { get; set; }
     public int UltimateDragonKills { get; set; }
+
+    public bool UltimateRewardReady { get; set; }
+    public bool UltimateRewardDeliveryPending { get; set; }
 
     public bool PendingNightReset { get; set; }
 
