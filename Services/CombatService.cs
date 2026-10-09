@@ -7,6 +7,7 @@ using StardewValley;
 using StardewValley.Monsters;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
+using SwordMastery;
 using SwordMastery.Models;
 
 namespace SwordMastery.Services;
@@ -89,20 +90,20 @@ internal sealed class CombatService
         string id = $"Basic{branch}";
         if (!data.Skills.TryGetValue(id, out SkillProgress? progress))
         {
-            message = "알 수 없는 기초검술입니다.";
+            message = I18n.Get("combat.unknown-basic");
             return false;
         }
 
         int stage = GetUnlockedStage(progress);
         if (stage <= 0)
         {
-            message = "이 기술에 먼저 SP를 투자해야 합니다.";
+            message = I18n.Get("combat.need-sp");
             return false;
         }
 
         if (Cooldowns.TryGetValue(branch, out int cooldown) && cooldown > 0)
         {
-            message = $"재사용 대기 {cooldown / 60f:0.0}초";
+            message = I18n.Get("combat.cooldown", new { seconds = (cooldown / 60f).ToString("0.0") });
             return false;
         }
 
@@ -116,7 +117,7 @@ internal sealed class CombatService
 
         if (!used)
         {
-            message = "기술을 사용할 수 없습니다.";
+            message = I18n.Get("combat.unavailable");
             return false;
         }
 
@@ -128,7 +129,7 @@ internal sealed class CombatService
     {
         if (!data.OhgiAccessGranted || data.SelectedOhgi is null)
         {
-            message = "선택된 오의가 없습니다.";
+            message = I18n.Get("combat.no-ohgi");
             return false;
         }
 
@@ -138,19 +139,19 @@ internal sealed class CombatService
 
         if (stage <= 0)
         {
-            message = "선택한 오의에 먼저 SP를 투자해야 합니다.";
+            message = I18n.Get("combat.need-ohgi-sp");
             return false;
         }
 
         if (branch == "B")
         {
-            message = "검기는 기본 검 공격에 자동 발동되는 패시브 오의입니다.";
+            message = I18n.Get("combat.wave-passive");
             return false;
         }
 
         if (Cooldowns["OHGI"] > 0)
         {
-            message = $"오의 재사용 대기 {Cooldowns["OHGI"] / 60f:0.0}초";
+            message = I18n.Get("combat.ohgi-cooldown", new { seconds = (Cooldowns["OHGI"] / 60f).ToString("0.0") });
             return false;
         }
 
@@ -163,7 +164,7 @@ internal sealed class CombatService
 
         if (!used)
         {
-            message = "오의를 사용할 수 없습니다.";
+            message = I18n.Get("combat.ohgi-unavailable");
             return false;
         }
 
@@ -175,7 +176,7 @@ internal sealed class CombatService
     {
         if (!data.UltimateAccessGranted || data.SelectedUltimate is null)
         {
-            message = "선택된 극의가 없습니다.";
+            message = I18n.Get("combat.no-ultimate");
             return false;
         }
 
@@ -185,13 +186,13 @@ internal sealed class CombatService
 
         if (stage <= 0)
         {
-            message = "선택한 극의에 먼저 SP를 투자해야 합니다.";
+            message = I18n.Get("combat.need-ultimate-sp");
             return false;
         }
 
         if (branch == "A")
         {
-            message = "검술의 극은 상시 발동되는 패시브 극의입니다.";
+            message = I18n.Get("combat.ultimate-passive");
             return false;
         }
 

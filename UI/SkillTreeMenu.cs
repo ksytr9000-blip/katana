@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
+using SwordMastery;
 using SwordMastery.Models;
 using SwordMastery.Services;
 
@@ -24,69 +25,69 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
     private readonly Dictionary<string, string> SkillNames = new()
     {
-        ["BasicA"] = "검사의 발걸음",
-        ["BasicB"] = "참격",
-        ["BasicC"] = "칼리코류 검술",
+        ["BasicA"] = I18n.Get("skill.basic-a.name"),
+        ["BasicB"] = I18n.Get("skill.basic-b.name"),
+        ["BasicC"] = I18n.Get("skill.basic-c.name"),
 
-        ["OhgiA"] = "일섬",
-        ["OhgiB"] = "검기",
-        ["OhgiC"] = "검술의 정점",
+        ["OhgiA"] = I18n.Get("skill.ohgi-a.name"),
+        ["OhgiB"] = I18n.Get("skill.ohgi-b.name"),
+        ["OhgiC"] = I18n.Get("skill.ohgi-c.name"),
 
-        ["UltimateA"] = "검술의 극",
-        ["UltimateB"] = "보법의 극"
+        ["UltimateA"] = I18n.Get("skill.ultimate-a.name"),
+        ["UltimateB"] = I18n.Get("skill.ultimate-b.name")
     };
 
     private readonly Dictionary<string, string[]> SkillDescriptions = new()
     {
         ["BasicA"] = new[]
         {
-            "1단계: 전방으로 대쉬",
-            "2단계: 대쉬 경로에 1회 베기",
-            "3단계: 대쉬 경로에 다회 베기"
+            I18n.Get("skill.basic-a.1"),
+            I18n.Get("skill.basic-a.2"),
+            I18n.Get("skill.basic-a.3")
         },
         ["BasicB"] = new[]
         {
-            "1단계: 전방 베기",
-            "2단계: 넓은 범위의 전방 베기",
-            "3단계: 초승달 검기 발사 · 장애물 충돌 시 소멸"
+            I18n.Get("skill.basic-b.1"),
+            I18n.Get("skill.basic-b.2"),
+            I18n.Get("skill.basic-b.3")
         },
         ["BasicC"] = new[]
         {
-            "1단계: 전방 3회 베기",
-            "2단계: 전방 180도 4회 베기",
-            "3단계: 전방 180도 6회 베기"
+            I18n.Get("skill.basic-c.1"),
+            I18n.Get("skill.basic-c.2"),
+            I18n.Get("skill.basic-c.3")
         },
 
         ["OhgiA"] = new[]
         {
-            "1단계: 5칸 전진 · 폭 1칸 · 99999 확정 치명타",
-            "2단계: 8칸 전진 · 폭 4칸 · 99999 확정 치명타",
-            "3단계: 맵 끝까지 돌진 · 폭 9칸 · 99999 확정 치명타"
+            I18n.Get("skill.ohgi-a.1"),
+            I18n.Get("skill.ohgi-a.2"),
+            I18n.Get("skill.ohgi-a.3")
         },
         ["OhgiB"] = new[]
         {
-            "1단계: 초승달 검기 · 1회 적중 후 소멸",
-            "2단계: 대형 검기 · 장거리 + 2마리 관통",
-            "3단계: 초대형 검기 · 초장거리 + 다수 관통"
+            I18n.Get("skill.ohgi-b.1"),
+            I18n.Get("skill.ohgi-b.2"),
+            I18n.Get("skill.ohgi-b.3")
         },
         ["OhgiC"] = new[]
         {
-            "1단계: 넓은 범위를 3회 난도질",
-            "2단계: 범위 증가 + 6회 타격",
-            "3단계: 범위 증가 + 10회 타격"
+            I18n.Get("skill.ohgi-c.1"),
+            I18n.Get("skill.ohgi-c.2"),
+            I18n.Get("skill.ohgi-c.3")
         },
 
         ["UltimateA"] = new[]
         {
-            "범위 안의 적에게 상시 자동 검격",
-            "2단계: 범위와 피해 증가",
-            "3단계: 더 넓은 범위와 강한 피해"
+            I18n.Get("skill.ultimate-a.1"),
+            I18n.Get("skill.ultimate-a.2"),
+            I18n.Get("skill.ultimate-a.3")
         },
         ["UltimateB"] = new[]
         {
-            "쿨다운 없는 이동기 + 주변 검격",
-            "2단계: 이동거리와 피해 증가",
-            "3단계: 긴 이동거리와 강한 피해"
+            I18n.Get("skill.ultimate-b.1"),
+            I18n.Get("skill.ultimate-b.2"),
+            I18n.Get("skill.ultimate-b.3")
         }
     };
 
@@ -247,7 +248,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
                 if (!Data.OhgiAccessGranted)
                 {
-                    message = "오의가 아직 해방되지 않았습니다.";
+                    message = I18n.Get("ui.msg.ohgi-locked");
                 }
                 else if (Data.SelectedOhgi is null)
                 {
@@ -259,7 +260,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
                 }
                 else
                 {
-                    message = "이미 다른 오의를 선택했습니다.";
+                    message = I18n.Get("ui.msg.ohgi-other");
                 }
             }
             else
@@ -268,7 +269,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
                 if (!Data.UltimateAccessGranted)
                 {
-                    message = "극의가 아직 해방되지 않았습니다.";
+                    message = I18n.Get("ui.msg.ultimate-locked");
                 }
                 else if (Data.SelectedUltimate is null)
                 {
@@ -280,7 +281,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
                 }
                 else
                 {
-                    message = "이미 다른 극의를 선택했습니다.";
+                    message = I18n.Get("ui.msg.ultimate-other");
                 }
             }
 
@@ -310,21 +311,21 @@ internal sealed class SkillTreeMenu : IClickableMenu
     {
         if (!prevOhgiQuest && Data.OhgiQuestAvailable)
         {
-            Game1.addHUDMessage(new HUDMessage("오의 해방 퀘스트가 생겼습니다.", HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(I18n.Get("notify.ohgi.quest"), HUDMessage.newQuest_type));
             Game1.playSound("questcomplete");
         }
 
         if (!prevUltimateQuest && Data.UltimateQuestAvailable)
         {
-            Game1.addHUDMessage(new HUDMessage("극의 해방 퀘스트가 생겼습니다.", HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(I18n.Get("notify.ultimate.quest"), HUDMessage.newQuest_type));
             Game1.playSound("questcomplete");
         }
 
         if (!prevOhgiAccess && Data.OhgiAccessGranted)
-            Game1.addHUDMessage(new HUDMessage("오의가 해방되었습니다.", HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(I18n.Get("notify.ohgi.unlocked"), HUDMessage.newQuest_type));
 
         if (!prevUltimateAccess && Data.UltimateAccessGranted)
-            Game1.addHUDMessage(new HUDMessage("극의가 해방되었습니다.", HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(I18n.Get("notify.ultimate.unlocked"), HUDMessage.newQuest_type));
     }
 
     public override void draw(SpriteBatch b)
@@ -343,9 +344,9 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         int ultimateLabelY = ohgiY + tile + 116;
 
-        DrawSectionLabel(b, "기초검술", basicLabelY);
-        DrawSectionLabel(b, "오의", ohgiLabelY);
-        DrawSectionLabel(b, "극의", ultimateLabelY);
+        DrawSectionLabel(b, I18n.Get("ui.section.basic"), basicLabelY);
+        DrawSectionLabel(b, I18n.Get("ui.section.ohgi"), ohgiLabelY);
+        DrawSectionLabel(b, I18n.Get("ui.section.ultimate"), ultimateLabelY);
 
         DrawSkill(b, "BasicA", "basic");
         DrawSkill(b, "BasicB", "basic");
@@ -393,7 +394,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         Utility.drawTextWithShadow(
             b,
-            "검술",
+            I18n.Get("ui.title"),
             Game1.dialogueFont,
             new Vector2(xPositionOnScreen + width / 2 - 52, yPositionOnScreen + 26),
             Game1.textColor
@@ -401,7 +402,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         Utility.drawTextWithShadow(
             b,
-            $"검술 Lv.{Data.SwordLevel}",
+            I18n.Get("ui.level", new { level = Data.SwordLevel }),
             Game1.smallFont,
             new Vector2(left, yPositionOnScreen + 94),
             Game1.textColor
@@ -448,7 +449,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         Utility.drawTextWithShadow(
             b,
-            $"남은 SP: {Data.UnspentSkillPoints}",
+            I18n.Get("ui.remaining-sp", new { sp = Data.UnspentSkillPoints }),
             Game1.smallFont,
             new Vector2(right - 160, yPositionOnScreen + 94),
             Game1.textColor
@@ -783,10 +784,10 @@ internal sealed class SkillTreeMenu : IClickableMenu
 
         int currentStage = GetCurrentStage(progress);
         string stageText = currentStage <= 0
-            ? "미습득"
+            ? I18n.Get("ui.unlearned")
             : currentStage >= 3 && progress.Stage3 >= 5
                 ? "MASTER"
-                : $"현재 {ToRoman(currentStage)}단계";
+                : I18n.Get("ui.current-stage", new { stage = ToRoman(currentStage) });
 
         Utility.drawTextWithShadow(
             b,
@@ -859,7 +860,7 @@ internal sealed class SkillTreeMenu : IClickableMenu
             new Color(154, 100, 52) * 0.60f
         );
 
-        string totalText = $"총 투자 {progress.TotalPoints}/15";
+        string totalText = I18n.Get("ui.total-invested", new { points = progress.TotalPoints });
 
         // Footer is now two separate rows so "총 투자" and the state/action
         // text never overlap, even with longer Korean labels.
@@ -977,11 +978,15 @@ internal sealed class SkillTreeMenu : IClickableMenu
     {
         string state = GetStateText(id);
 
-        if (state.StartsWith("잠김") || state.StartsWith("선택 불가"))
+        if (IsLocked(id, GetGroup(id)))
             return new Color(115, 92, 75);
 
-        if (state.Contains("선택됨") || state.Contains("MASTER"))
+        if (Data.Skills[id].IsMastered
+            || id == $"Ohgi{Data.SelectedOhgi}"
+            || id == $"Ultimate{Data.SelectedUltimate}")
+        {
             return new Color(49, 112, 52);
+        }
 
         return new Color(57, 72, 125);
     }
@@ -1002,39 +1007,39 @@ internal sealed class SkillTreeMenu : IClickableMenu
         string group = GetGroup(id);
 
         if (group == "basic")
-            return Data.Skills[id].IsMastered ? "MASTER" : "클릭: SP 1 투자";
+            return Data.Skills[id].IsMastered ? I18n.Get("ui.state.basic.master") : I18n.Get("ui.state.basic.invest");
 
         string branch = id[^1].ToString();
 
         if (group == "ohgi")
         {
             if (!Data.OhgiAccessGranted)
-                return "잠김: 오의 해방 필요";
+                return I18n.Get("ui.state.ohgi.locked");
 
             if (Data.SelectedOhgi is null)
             {
                 if (!Data.Skills[$"Basic{branch}"].IsMastered)
-                    return $"잠김: 기초검술 {branch} MASTER 필요";
+                    return I18n.Get("ui.state.ohgi.require-basic", new { branch });
 
-                return "클릭: 이 오의를 선택";
+                return I18n.Get("ui.state.ohgi.choose");
             }
 
             if (Data.SelectedOhgi == branch)
-                return Data.Skills[id].IsMastered ? "선택됨 · MASTER" : "선택됨 · 클릭: SP 1 투자";
+                return Data.Skills[id].IsMastered ? I18n.Get("ui.state.selected.master") : I18n.Get("ui.state.selected.invest");
 
-            return "선택 불가: 다른 오의가 확정됨";
+            return I18n.Get("ui.state.ohgi.other");
         }
 
         if (!Data.UltimateAccessGranted)
-            return "잠김: 극의 해방 필요";
+            return I18n.Get("ui.state.ultimate.locked");
 
         if (Data.SelectedUltimate is null)
-            return "클릭: 이 극의를 선택";
+            return I18n.Get("ui.state.ultimate.choose");
 
         if (Data.SelectedUltimate == branch)
-            return Data.Skills[id].IsMastered ? "선택됨 · MASTER" : "선택됨 · 클릭: SP 1 투자";
+            return Data.Skills[id].IsMastered ? I18n.Get("ui.state.selected.master") : I18n.Get("ui.state.selected.invest");
 
-        return "선택 불가: 다른 극의가 확정됨";
+        return I18n.Get("ui.state.ultimate.other");
     }
 
 }

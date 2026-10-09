@@ -1,0 +1,134 @@
+SWORD MASTERY
+
+Turn sword combat into a full progression system.
+
+Sword Mastery adds a separate sword level, skill points, branching skill trees, active sword techniques, Secret Arts, Ultimates, unlock quests, custom combat effects, cooldown HUDs, and a respec system.
+
+FEATURES
+• Separate Sword Mastery Level
+• Gain Sword EXP by defeating monsters
+• Earn SP and invest it into sword skills
+• Three Basic Swordsmanship branches
+• Three Secret Art branches — choose one
+• Two Ultimate branches — choose one
+• Custom slash, dash, sword-wave, multi-hit, and area effects
+• Cooldown HUD with configurable position
+• Unlock quests at Sword Mastery Lv.30 and Lv.50
+• Custom quest items and Dragon Orb drops
+• Full respec support
+• Generic Mod Config Menu integration
+• English + Korean localization
+• Vortex-friendly package layout
+
+BASIC SWORDSMANSHIP
+Swordsman's Step
+- Dash-based sword technique.
+
+Slash
+- Forward slash that evolves into a ranged crescent sword wave.
+
+Calico Style Swordsmanship
+- Rapid multi-hit frontal sword combo.
+
+SECRET ARTS
+Choose only one branch.
+
+Issen
+- A finishing rush technique with guaranteed 99,999 critical damage.
+- Higher stages increase travel distance and attack width.
+
+Sword Wave
+- Normal sword attacks automatically release crescent sword waves.
+- Higher stages increase size, range, and piercing.
+
+Pinnacle of Swordsmanship
+- A wide-area multi-slash finisher around the player.
+
+ULTIMATES
+Choose only one branch.
+
+Swordsmanship Apex
+- Passive area slashes that automatically attack nearby enemies.
+
+Ultimate Footwork
+- A cooldown-free movement technique that damages enemies along the movement path.
+
+UNLOCK QUESTS
+• Sword Mastery Lv.30: Secret Art unlock quest
+• Sword Mastery Lv.50: Ultimate unlock quest
+• The Ultimate quest includes Dragon hunting and collecting Dragon Orbs.
+• Quest rewards are claimed from the vanilla journal.
+
+DEFAULT CONTROLS
+K   Open Sword Mastery menu
+F6  Swordsman's Step
+F7  Slash
+F8  Calico Style Swordsmanship
+F9  Selected active Secret Art
+F10 Selected active Ultimate
+
+All hotkeys can be changed through Generic Mod Config Menu.
+
+REQUIREMENTS
+Required:
+• SMAPI 4.3.0 or later
+
+Optional:
+• Generic Mod Config Menu
+
+INSTALLATION - VORTEX
+1. Click Mod Manager Download.
+2. Enable/deploy the mod in Vortex.
+3. Launch Stardew Valley through SMAPI.
+
+INSTALLATION - MANUAL
+1. Install SMAPI.
+2. Extract the SwordMastery folder into Stardew Valley/Mods.
+3. Launch the game through SMAPI.
+
+LANGUAGES
+• English — default
+• Korean — included
+
+The mod automatically follows the Stardew Valley language setting. No separate language option is needed.
+
+COMPATIBILITY
+Developed for Stardew Valley 1.6.x with SMAPI.
+The mod uses its own sword progression and does not replace vanilla professions.
+
+BUG REPORTS
+Please include:
+• SMAPI version
+• Stardew Valley version
+• Full SMAPI log
+• Skill/quest involved
+• Reproduction steps
+
+
+────────────────────────────────────
+한국어 안내
+────────────────────────────────────
+
+검 전투에 별도의 성장 시스템을 추가하는 SMAPI 모드입니다.
+
+주요 기능
+• 별도의 검술 레벨 / EXP / SP
+• 기초검술 3계열
+• 오의 3계열 중 1개 선택
+• 극의 2계열 중 1개 선택
+• 대쉬, 검기, 연속베기, 범위기 전용 이펙트
+• 쿨다운 HUD
+• 검술 Lv.30 / Lv.50 해방 퀘스트
+• 오의 비책 / 깨달음의 물방울 / 용의 보주
+• 스킬 초기화
+• GMCM 지원
+• 영어 / 한국어 지원
+• Vortex 설치 지원
+
+언어는 별도의 선택 메뉴가 아니라 스타듀밸리의 현재 언어 설정을 자동으로 따라갑니다.
+
+필수
+• SMAPI 4.3.0+
+
+선택
+• Generic Mod Config Menu

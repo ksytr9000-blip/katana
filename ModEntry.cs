@@ -35,6 +35,7 @@ internal sealed class ModEntry : Mod
 
     public override void Entry(IModHelper helper)
     {
+        I18n.Init(helper);
         Config = helper.ReadConfig<ModConfig>();
         Progression = new ProgressionService(Config);
         Skills = new SkillService();
@@ -83,8 +84,8 @@ internal sealed class ModEntry : Mod
                 objects[OhgiSecretBookId] = new ObjectData
                 {
                     Name = OhgiSecretBookId,
-                    DisplayName = "오의 비책",
-                    Description = "오의를 해방하는 비법서. 손에 들고 행동 버튼으로 사용한다.",
+                    DisplayName = I18n.Get("item.ohgi-book.name"),
+                    Description = I18n.Get("item.ohgi-book.description"),
                     Type = "Crafting",
                     Category = 0,
                     Price = 0,
@@ -101,8 +102,8 @@ internal sealed class ModEntry : Mod
                 objects[InsightDropId] = new ObjectData
                 {
                     Name = InsightDropId,
-                    DisplayName = "깨달음의 물방울",
-                    Description = "극의를 해방하는 응축된 깨달음. 손에 들고 행동 버튼으로 사용한다.",
+                    DisplayName = I18n.Get("item.insight-drop.name"),
+                    Description = I18n.Get("item.insight-drop.description"),
                     Type = "Crafting",
                     Category = 0,
                     Price = 0,
@@ -121,8 +122,8 @@ internal sealed class ModEntry : Mod
                 objects[DragonOrbId] = new ObjectData
                 {
                     Name = DragonOrbId,
-                    DisplayName = "용의 보주",
-                    Description = "용의 기운이 응축된 보주. 손에 쥐면 안쪽에서 강한 맥동이 느껴진다.",
+                    DisplayName = I18n.Get("item.dragon-orb.name"),
+                    Description = I18n.Get("item.dragon-orb.description"),
                     Type = "Crafting",
                     Category = 0,
                     Price = 0,
@@ -149,16 +150,16 @@ internal sealed class ModEntry : Mod
                 // Basic quests are completed manually by this mod so we can track
                 // multiple custom objectives while still displaying them in the vanilla journal.
                 quests[OhgiQuestId] =
-                    "Basic/[오의]새로운 경지를 깨우칠 것 같다."
-                    + "/새로운 경지가 손에 잡힐 듯하다. 실전 속에서 감각을 완성해 보자."
-                    + "/목표 - 귀신들린 해골(채석장 광산) 사냥: 0／30"
-                    + "/null/-1/1/오의 비책/false";
+                    "Basic/" + I18n.Get("quest.ohgi.title")
+                    + "/" + I18n.Get("quest.ohgi.description")
+                    + "/" + I18n.Get("quest.ohgi.objective.initial")
+                    + "/null/-1/1/" + I18n.Get("quest.ohgi.reward") + "/false";
 
                 quests[UltimateQuestId] =
-                    "Basic/[극의]검술의 극에 달할 수 있을 것 같다."
-                    + "/검술의 극에 닿기 위해서는 용을 넘어 그 힘까지 받아들여야 한다."
-                    + "/목표 1 - 용 사냥: 0／50 | 목표 2 - 용의 보주: 0／10"
-                    + "/null/-1/1/깨달음의 물방울/false";
+                    "Basic/" + I18n.Get("quest.ultimate.title")
+                    + "/" + I18n.Get("quest.ultimate.description")
+                    + "/" + I18n.Get("quest.ultimate.objective.initial")
+                    + "/null/-1/1/" + I18n.Get("quest.ultimate.reward") + "/false";
             });
         }
     }
@@ -185,29 +186,29 @@ internal sealed class ModEntry : Mod
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
-            text: () => "검술 모드 설정"
+            text: () => I18n.Get("gmcm.section.main")
         );
 
         gmcm.AddKeybind(
             mod: ModManifest,
             getValue: () => Config.OpenMenuKey,
             setValue: value => Config.OpenMenuKey = value,
-            name: () => "검술창 열기 키",
-            tooltip: () => "검술 레벨과 스킬 배분창을 열고 닫는 키입니다.",
+            name: () => I18n.Get("gmcm.open-menu.name"),
+            tooltip: () => I18n.Get("gmcm.open-menu.tip"),
             fieldId: "OpenMenuKey"
         );
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
-            text: () => "기초검술 단축키"
+            text: () => I18n.Get("gmcm.section.basic-keys")
         );
 
         gmcm.AddKeybind(
             mod: ModManifest,
             getValue: () => Config.BasicSkillAKey,
             setValue: value => Config.BasicSkillAKey = value,
-            name: () => "검사의 발걸음",
-            tooltip: () => "기초검술 A: 전방 대쉬 계열 기술입니다.",
+            name: () => I18n.Get("skill.basic-a.name"),
+            tooltip: () => I18n.Get("gmcm.basic-a.tip"),
             fieldId: "BasicSkillAKey"
         );
 
@@ -215,8 +216,8 @@ internal sealed class ModEntry : Mod
             mod: ModManifest,
             getValue: () => Config.BasicSkillBKey,
             setValue: value => Config.BasicSkillBKey = value,
-            name: () => "참격",
-            tooltip: () => "기초검술 B: 전방 베기 / 검기 계열 기술입니다.",
+            name: () => I18n.Get("skill.basic-b.name"),
+            tooltip: () => I18n.Get("gmcm.basic-b.tip"),
             fieldId: "BasicSkillBKey"
         );
 
@@ -224,22 +225,22 @@ internal sealed class ModEntry : Mod
             mod: ModManifest,
             getValue: () => Config.BasicSkillCKey,
             setValue: value => Config.BasicSkillCKey = value,
-            name: () => "칼리코류 검술",
-            tooltip: () => "기초검술 C: 다단 검격 계열 기술입니다.",
+            name: () => I18n.Get("skill.basic-c.name"),
+            tooltip: () => I18n.Get("gmcm.basic-c.tip"),
             fieldId: "BasicSkillCKey"
         );
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
-            text: () => "오의 / 극의 단축키"
+            text: () => I18n.Get("gmcm.section.special-keys")
         );
 
         gmcm.AddKeybind(
             mod: ModManifest,
             getValue: () => Config.OhgiSkillKey,
             setValue: value => Config.OhgiSkillKey = value,
-            name: () => "오의 발동 키",
-            tooltip: () => "일섬/검술의 정점 발동용입니다. 검기 오의는 기본 검 공격에 자동 발동됩니다.",
+            name: () => I18n.Get("gmcm.ohgi-key.name"),
+            tooltip: () => I18n.Get("gmcm.ohgi-key.tip"),
             fieldId: "OhgiSkillKey"
         );
 
@@ -247,22 +248,22 @@ internal sealed class ModEntry : Mod
             mod: ModManifest,
             getValue: () => Config.UltimateSkillKey,
             setValue: value => Config.UltimateSkillKey = value,
-            name: () => "극의 발동 키",
-            tooltip: () => "보법의 극 발동용입니다. 검술의 극은 상시 자동 발동됩니다.",
+            name: () => I18n.Get("gmcm.ultimate-key.name"),
+            tooltip: () => I18n.Get("gmcm.ultimate-key.tip"),
             fieldId: "UltimateSkillKey"
         );
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
-            text: () => "HUD 설정"
+            text: () => I18n.Get("gmcm.section.hud")
         );
 
         gmcm.AddBoolOption(
             mod: ModManifest,
             getValue: () => Config.ShowHud,
             setValue: value => Config.ShowHud = value,
-            name: () => "검술 HUD 표시",
-            tooltip: () => "검술 레벨 / EXP / SP 표시를 켜거나 끕니다.",
+            name: () => I18n.Get("gmcm.hud.show.name"),
+            tooltip: () => I18n.Get("gmcm.hud.show.tip"),
             fieldId: "ShowHud"
         );
 
@@ -270,8 +271,8 @@ internal sealed class ModEntry : Mod
             mod: ModManifest,
             getValue: () => Config.HudX,
             setValue: value => Config.HudX = value,
-            name: () => "HUD X 위치",
-            tooltip: () => "화면 왼쪽을 기준으로 HUD의 가로 위치를 조절합니다.",
+            name: () => I18n.Get("gmcm.hud.x.name"),
+            tooltip: () => I18n.Get("gmcm.hud.x.tip"),
             min: 0,
             max: 4000,
             interval: 8,
@@ -283,8 +284,8 @@ internal sealed class ModEntry : Mod
             mod: ModManifest,
             getValue: () => Config.HudY,
             setValue: value => Config.HudY = value,
-            name: () => "HUD Y 위치",
-            tooltip: () => "화면 위쪽을 기준으로 HUD의 세로 위치를 조절합니다.",
+            name: () => I18n.Get("gmcm.hud.y.name"),
+            tooltip: () => I18n.Get("gmcm.hud.y.tip"),
             min: 0,
             max: 2400,
             interval: 8,
@@ -294,15 +295,15 @@ internal sealed class ModEntry : Mod
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
-            text: () => "쿨다운 HUD"
+            text: () => I18n.Get("gmcm.section.cooldown")
         );
 
         gmcm.AddBoolOption(
             mod: ModManifest,
             getValue: () => Config.ShowCooldownHud,
             setValue: value => Config.ShowCooldownHud = value,
-            name: () => "쿨다운 HUD 표시",
-            tooltip: () => "기초검술과 선택한 액티브 오의의 쿨다운 아이콘을 표시합니다.",
+            name: () => I18n.Get("gmcm.cooldown.show.name"),
+            tooltip: () => I18n.Get("gmcm.cooldown.show.tip"),
             fieldId: "ShowCooldownHud"
         );
 
@@ -310,8 +311,8 @@ internal sealed class ModEntry : Mod
             mod: ModManifest,
             getValue: () => Config.CooldownHudX,
             setValue: value => Config.CooldownHudX = value,
-            name: () => "쿨다운 HUD X 위치",
-            tooltip: () => "쿨다운 아이콘 HUD의 가로 위치를 조절합니다.",
+            name: () => I18n.Get("gmcm.cooldown.x.name"),
+            tooltip: () => I18n.Get("gmcm.cooldown.x.tip"),
             min: 0,
             max: 4000,
             interval: 8,
@@ -323,8 +324,8 @@ internal sealed class ModEntry : Mod
             mod: ModManifest,
             getValue: () => Config.CooldownHudY,
             setValue: value => Config.CooldownHudY = value,
-            name: () => "쿨다운 HUD Y 위치",
-            tooltip: () => "쿨다운 아이콘 HUD의 세로 위치를 조절합니다.",
+            name: () => I18n.Get("gmcm.cooldown.y.name"),
+            tooltip: () => I18n.Get("gmcm.cooldown.y.tip"),
             min: 0,
             max: 2400,
             interval: 8,
@@ -335,27 +336,27 @@ internal sealed class ModEntry : Mod
         gmcm.AddPageLink(
             mod: ModManifest,
             pageId: "debug",
-            text: () => "DEBUG 테스트 도구",
-            tooltip: () => "개발/테스트용 수치를 직접 변경합니다."
+            text: () => I18n.Get("gmcm.debug.link"),
+            tooltip: () => I18n.Get("gmcm.debug.link.tip")
         );
 
         gmcm.AddPage(
             mod: ModManifest,
             pageId: "debug",
-            pageTitle: () => "검술 마스터리 DEBUG"
+            pageTitle: () => I18n.Get("gmcm.debug.title")
         );
 
         gmcm.AddParagraph(
             mod: ModManifest,
-            text: () => "※ 세이브를 불러온 상태에서만 적용됩니다. 테스트용 설정입니다."
+            text: () => I18n.Get("gmcm.debug.warning")
         );
 
         gmcm.AddNumberOption(
             mod: ModManifest,
             getValue: () => Context.IsWorldReady ? Data.SwordLevel : 0,
             setValue: value => ApplyDebugSwordLevel(value),
-            name: () => "검술 레벨",
-            tooltip: () => "검술 레벨을 즉시 변경합니다. 변경 시 현재 EXP는 0이 되고, 투자된 SP를 제외한 만큼 남은 SP를 자동 계산합니다.",
+            name: () => I18n.Get("gmcm.debug.level.name"),
+            tooltip: () => I18n.Get("gmcm.debug.level.tip"),
             min: 0,
             max: Config.MaxSwordLevel,
             interval: 1,
@@ -370,8 +371,8 @@ internal sealed class ModEntry : Mod
                 if (Context.IsWorldReady)
                     Data.UnspentSkillPoints = Math.Max(0, value);
             },
-            name: () => "남은 SP",
-            tooltip: () => "테스트를 위해 남은 스킬 포인트를 직접 설정합니다.",
+            name: () => I18n.Get("gmcm.debug.sp.name"),
+            tooltip: () => I18n.Get("gmcm.debug.sp.tip"),
             min: 0,
             max: 200,
             interval: 1,
@@ -392,8 +393,8 @@ internal sealed class ModEntry : Mod
                 if (!value)
                     Data.SelectedOhgi = null;
             },
-            name: () => "오의 강제 해방",
-            tooltip: () => "오의 선택/강화 UI 테스트용입니다. 끄면 선택한 오의 분기도 해제됩니다.",
+            name: () => I18n.Get("gmcm.debug.ohgi.name"),
+            tooltip: () => I18n.Get("gmcm.debug.ohgi.tip"),
             fieldId: "DebugOhgiAccess"
         );
 
@@ -411,14 +412,14 @@ internal sealed class ModEntry : Mod
                 if (!value)
                     Data.SelectedUltimate = null;
             },
-            name: () => "극의 강제 해방",
-            tooltip: () => "극의 선택/강화 UI 테스트용입니다. 끄면 선택한 극의 분기도 해제됩니다.",
+            name: () => I18n.Get("gmcm.debug.ultimate.name"),
+            tooltip: () => I18n.Get("gmcm.debug.ultimate.tip"),
             fieldId: "DebugUltimateAccess"
         );
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
-            text: () => "DEBUG 실행 버튼"
+            text: () => I18n.Get("gmcm.debug.section.actions")
         );
 
         gmcm.AddBoolOption(
@@ -429,8 +430,8 @@ internal sealed class ModEntry : Mod
                 if (value)
                     DebugActivateAllSkills();
             },
-            name: () => "[실행] 모든 스킬 활성화",
-            tooltip: () => "모든 기술을 15/15 MASTER 처리하고 오의/극의 해방 상태로 만듭니다. 분기 선택은 검술창에서 합니다.",
+            name: () => I18n.Get("gmcm.debug.all-skills.name"),
+            tooltip: () => I18n.Get("gmcm.debug.all-skills.tip"),
             fieldId: "DebugActivateAllSkills"
         );
 
@@ -442,14 +443,14 @@ internal sealed class ModEntry : Mod
                 if (value)
                     DebugGiveUnlockItems();
             },
-            name: () => "[받기] 해방 아이템 2종 지급",
-            tooltip: () => "오의 비책 1개와 깨달음의 물방울 1개를 인벤토리에 지급합니다.",
+            name: () => I18n.Get("gmcm.debug.unlock-items.name"),
+            tooltip: () => I18n.Get("gmcm.debug.unlock-items.tip"),
             fieldId: "DebugGiveUnlockItems"
         );
 
         gmcm.AddSectionTitle(
             mod: ModManifest,
-            text: () => "퀘스트 DEBUG"
+            text: () => I18n.Get("gmcm.debug.section.quests")
         );
 
         gmcm.AddBoolOption(
@@ -460,8 +461,8 @@ internal sealed class ModEntry : Mod
                 if (value)
                     DebugStartOhgiQuest();
             },
-            name: () => "[퀘스트] 오의 퀘스트 시작",
-            tooltip: () => "레벨 조건을 무시하고 오의 해방 퀘스트를 일지에 추가합니다.",
+            name: () => I18n.Get("gmcm.debug.ohgi-start.name"),
+            tooltip: () => I18n.Get("gmcm.debug.ohgi-start.tip"),
             fieldId: "DebugStartOhgiQuest"
         );
 
@@ -473,8 +474,8 @@ internal sealed class ModEntry : Mod
                 if (value)
                     DebugCompleteOhgiQuest();
             },
-            name: () => "[퀘스트] 오의 퀘스트 즉시 완료",
-            tooltip: () => "귀신들린 해골(채석장 광산) 30마리 진행도를 채우고 오의 비책 보상을 지급합니다.",
+            name: () => I18n.Get("gmcm.debug.ohgi-complete.name"),
+            tooltip: () => I18n.Get("gmcm.debug.ohgi-complete.tip"),
             fieldId: "DebugCompleteOhgiQuest"
         );
 
@@ -486,8 +487,8 @@ internal sealed class ModEntry : Mod
                 if (value)
                     DebugStartUltimateQuest();
             },
-            name: () => "[퀘스트] 극의 퀘스트 시작",
-            tooltip: () => "레벨 조건을 무시하고 극의 해방 퀘스트를 일지에 추가합니다.",
+            name: () => I18n.Get("gmcm.debug.ultimate-start.name"),
+            tooltip: () => I18n.Get("gmcm.debug.ultimate-start.tip"),
             fieldId: "DebugStartUltimateQuest"
         );
 
@@ -499,8 +500,8 @@ internal sealed class ModEntry : Mod
                 if (value)
                     DebugSetUltimateKills();
             },
-            name: () => "[퀘스트] 용 50마리 처리",
-            tooltip: () => "극의 퀘스트의 용 사냥 진행도를 50/50으로 만듭니다.",
+            name: () => I18n.Get("gmcm.debug.dragon-kills.name"),
+            tooltip: () => I18n.Get("gmcm.debug.dragon-kills.tip"),
             fieldId: "DebugSetUltimateKills"
         );
 
@@ -512,8 +513,8 @@ internal sealed class ModEntry : Mod
                 if (value)
                     DebugGiveDragonOrbs(10);
             },
-            name: () => "[받기] 용의 보주 10개",
-            tooltip: () => "극의 퀘스트 테스트용 용의 보주를 10개 지급합니다.",
+            name: () => I18n.Get("gmcm.debug.orbs.name"),
+            tooltip: () => I18n.Get("gmcm.debug.orbs.tip"),
             fieldId: "DebugGiveDragonOrbs"
         );
 
@@ -525,8 +526,8 @@ internal sealed class ModEntry : Mod
                 if (value)
                     DebugCompleteUltimateQuest();
             },
-            name: () => "[퀘스트] 극의 퀘스트 즉시 완료",
-            tooltip: () => "용 사냥과 용의 보주 조건을 모두 채운 뒤 완료 연출과 보상을 테스트합니다.",
+            name: () => I18n.Get("gmcm.debug.ultimate-complete.name"),
+            tooltip: () => I18n.Get("gmcm.debug.ultimate-complete.tip"),
             fieldId: "DebugCompleteUltimateQuest"
         );
 
@@ -574,7 +575,7 @@ internal sealed class ModEntry : Mod
         Data.UnspentSkillPoints = Math.Max(Data.UnspentSkillPoints, 200);
 
         Game1.addHUDMessage(new HUDMessage(
-            "DEBUG: 모든 스킬을 MASTER 처리했습니다. 오의/극의 분기는 검술창에서 선택하세요.",
+            I18n.Get("debug.all-skills"),
             HUDMessage.newQuest_type
         ));
         Game1.playSound("achievement");
@@ -596,7 +597,7 @@ internal sealed class ModEntry : Mod
         if (book && drop)
         {
             Game1.addHUDMessage(new HUDMessage(
-                "DEBUG: 오의 비책과 깨달음의 물방울을 지급했습니다.",
+                I18n.Get("debug.unlock-items.ok"),
                 HUDMessage.newQuest_type
             ));
             Game1.playSound("getNewSpecialItem");
@@ -604,7 +605,7 @@ internal sealed class ModEntry : Mod
         else
         {
             Game1.addHUDMessage(new HUDMessage(
-                "인벤토리 공간이 부족합니다. 일부 아이템은 지급되지 않았습니다."
+                I18n.Get("debug.inventory-full")
             ));
             Game1.playSound("cancel");
         }
@@ -634,8 +635,8 @@ internal sealed class ModEntry : Mod
 
         Game1.addHUDMessage(new HUDMessage(
             inserted
-                ? "DEBUG: 오의 해방 퀘스트를 일지에 추가했습니다."
-                : "DEBUG 오류: 오의 퀘스트가 일지에 추가되지 않았습니다. SMAPI 로그를 확인하세요.",
+                ? I18n.Get("debug.ohgi-start.ok")
+                : I18n.Get("debug.ohgi-start.fail"),
             inserted ? HUDMessage.newQuest_type : HUDMessage.error_type
         ));
     }
@@ -673,8 +674,8 @@ internal sealed class ModEntry : Mod
 
         Game1.addHUDMessage(new HUDMessage(
             inserted
-                ? "DEBUG: 극의 해방 퀘스트를 일지에 추가했습니다."
-                : "DEBUG 오류: 극의 퀘스트가 일지에 추가되지 않았습니다. SMAPI 로그를 확인하세요.",
+                ? I18n.Get("debug.ultimate-start.ok")
+                : I18n.Get("debug.ultimate-start.fail"),
             inserted ? HUDMessage.newQuest_type : HUDMessage.error_type
         ));
     }
@@ -691,7 +692,7 @@ internal sealed class ModEntry : Mod
         UpdateUltimateQuestObjective();
 
         Game1.addHUDMessage(new HUDMessage(
-            "DEBUG: 용 사냥 진행도를 50/50으로 설정했습니다."
+            I18n.Get("debug.dragon-kills")
         ));
 
         CheckUltimateQuestCompletion();
@@ -705,7 +706,7 @@ internal sealed class ModEntry : Mod
         GiveItemOrDrop($"(O){DragonOrbId}", count);
 
         Game1.addHUDMessage(new HUDMessage(
-            $"DEBUG: 용의 보주 {count}개를 지급했습니다.",
+            I18n.Get("debug.orbs", new { count }),
             HUDMessage.newQuest_type
         ));
 
@@ -744,7 +745,7 @@ internal sealed class ModEntry : Mod
             EnsureQuestInJournal(OhgiQuestId);
             MarkQuestReadyForJournalReward(
                 OhgiQuestId,
-                "오의 비책"
+                I18n.Get("item.ohgi-book.name")
             );
         }
         else if (Data.OhgiQuestAvailable && !Data.OhgiQuestCompleted)
@@ -763,7 +764,7 @@ internal sealed class ModEntry : Mod
             EnsureQuestInJournal(UltimateQuestId);
             MarkQuestReadyForJournalReward(
                 UltimateQuestId,
-                "깨달음의 물방울"
+                I18n.Get("item.insight-drop.name")
             );
         }
         else if (Data.UltimateQuestAvailable && !Data.UltimateQuestCompleted)
@@ -843,7 +844,7 @@ internal sealed class ModEntry : Mod
                 UpdateOhgiQuestObjective();
 
                 Game1.addHUDMessage(new HUDMessage(
-                    $"귀신들린 해골 {Data.OhgiSkullKills}/30",
+                    I18n.Get("quest.ohgi.kill-progress", new { count = Data.OhgiSkullKills }),
                     HUDMessage.newQuest_type
                 ));
 
@@ -1112,11 +1113,11 @@ internal sealed class ModEntry : Mod
 
         MarkQuestReadyForJournalReward(
             OhgiQuestId,
-            "오의 비책"
+            I18n.Get("item.ohgi-book.name")
         );
 
         Game1.addHUDMessage(new HUDMessage(
-            "오의 해방 퀘스트 완료! 일지에서 보상을 수령하세요.",
+            I18n.Get("quest.ohgi.complete"),
             HUDMessage.newQuest_type
         ));
         Game1.playSound("questcomplete");
@@ -1147,11 +1148,11 @@ internal sealed class ModEntry : Mod
 
         MarkQuestReadyForJournalReward(
             UltimateQuestId,
-            "깨달음의 물방울"
+            I18n.Get("item.insight-drop.name")
         );
 
         Game1.addHUDMessage(new HUDMessage(
-            "용의 보주의 힘이 몸에 스며들었다. 일지에서 보상을 수령하세요.",
+            I18n.Get("quest.ultimate.complete"),
             HUDMessage.newQuest_type
         ));
     }
@@ -1227,7 +1228,7 @@ internal sealed class ModEntry : Mod
 
             if (TryDeliverPendingQuestReward(
                     $"(O){OhgiSecretBookId}",
-                    "오의 비책"
+                    I18n.Get("item.ohgi-book.name")
                 ))
             {
                 Data.OhgiRewardDeliveryPending = false;
@@ -1235,7 +1236,7 @@ internal sealed class ModEntry : Mod
             else
             {
                 Game1.addHUDMessage(new HUDMessage(
-                    "인벤토리가 가득 찼습니다. 공간이 생기면 오의 비책이 자동 지급됩니다.",
+                    I18n.Get("reward.pending.ohgi"),
                     HUDMessage.error_type
                 ));
             }
@@ -1253,7 +1254,7 @@ internal sealed class ModEntry : Mod
 
             if (TryDeliverPendingQuestReward(
                     $"(O){InsightDropId}",
-                    "깨달음의 물방울"
+                    I18n.Get("item.insight-drop.name")
                 ))
             {
                 Data.UltimateRewardDeliveryPending = false;
@@ -1261,7 +1262,7 @@ internal sealed class ModEntry : Mod
             else
             {
                 Game1.addHUDMessage(new HUDMessage(
-                    "인벤토리가 가득 찼습니다. 공간이 생기면 깨달음의 물방울이 자동 지급됩니다.",
+                    I18n.Get("reward.pending.ultimate"),
                     HUDMessage.error_type
                 ));
             }
@@ -1270,7 +1271,7 @@ internal sealed class ModEntry : Mod
         if (Data.OhgiRewardDeliveryPending
             && TryDeliverPendingQuestReward(
                 $"(O){OhgiSecretBookId}",
-                "오의 비책"
+                I18n.Get("item.ohgi-book.name")
             ))
         {
             Data.OhgiRewardDeliveryPending = false;
@@ -1279,7 +1280,7 @@ internal sealed class ModEntry : Mod
         if (Data.UltimateRewardDeliveryPending
             && TryDeliverPendingQuestReward(
                 $"(O){InsightDropId}",
-                "깨달음의 물방울"
+                I18n.Get("item.insight-drop.name")
             ))
         {
             Data.UltimateRewardDeliveryPending = false;
@@ -1335,7 +1336,7 @@ internal sealed class ModEntry : Mod
             return false;
 
         Game1.addHUDMessage(new HUDMessage(
-            $"{displayName}을(를) 받았습니다.",
+            I18n.Get("reward.received", new { name = displayName }),
             HUDMessage.newQuest_type
         ));
         Game1.playSound("coin");
@@ -1369,7 +1370,7 @@ internal sealed class ModEntry : Mod
         );
 
         Game1.addHUDMessage(new HUDMessage(
-            "용의 보주가 떨어졌습니다.",
+            I18n.Get("drop.dragon-orb"),
             HUDMessage.newQuest_type
         ));
         Game1.playSound("discoverMineral");
@@ -1385,7 +1386,7 @@ internal sealed class ModEntry : Mod
         }
 
         string objective =
-            $"목표 - 귀신들린 해골(채석장 광산) 사냥: {Math.Min(30, Data.OhgiSkullKills)}/30";
+            I18n.Get("quest.ohgi.objective.progress", new { count = Math.Min(30, Data.OhgiSkullKills) });
 
         SetQuestObjective(
             OhgiQuestId,
@@ -1394,7 +1395,7 @@ internal sealed class ModEntry : Mod
 
         SetQuestProgressDescription(
             OhgiQuestId,
-            "새로운 경지가 손에 잡힐 듯하다. 실전 속에서 감각을 완성해 보자.",
+            I18n.Get("quest.ohgi.description"),
             objective
         );
     }
@@ -1414,8 +1415,7 @@ internal sealed class ModEntry : Mod
         );
 
         string objective =
-            $"목표 1 - 용 사냥: {Math.Min(50, Data.UltimateDragonKills)}/50\n"
-            + $"목표 2 - 용의 보주: {orbs}/10";
+            I18n.Get("quest.ultimate.objective.progress", new { kills = Math.Min(50, Data.UltimateDragonKills), orbs });
 
         SetQuestObjective(
             UltimateQuestId,
@@ -1424,7 +1424,7 @@ internal sealed class ModEntry : Mod
 
         SetQuestProgressDescription(
             UltimateQuestId,
-            "검술의 극에 닿기 위해서는 용을 넘어 그 힘까지 받아들여야 한다.",
+            I18n.Get("quest.ultimate.description"),
             objective
         );
     }
@@ -2025,7 +2025,7 @@ internal sealed class ModEntry : Mod
         {
             if (Data.OhgiAccessGranted)
             {
-                Game1.addHUDMessage(new HUDMessage("오의는 이미 해방되어 있습니다."));
+                Game1.addHUDMessage(new HUDMessage(I18n.Get("unlock.ohgi.already")));
                 Game1.playSound("cancel");
                 return true;
             }
@@ -2034,7 +2034,7 @@ internal sealed class ModEntry : Mod
             ConsumeActiveObject(held);
 
             Game1.addHUDMessage(new HUDMessage(
-                "오의가 해방되었습니다.",
+                I18n.Get("unlock.ohgi.done"),
                 HUDMessage.newQuest_type
             ));
             Game1.playSound("getNewSpecialItem");
@@ -2045,7 +2045,7 @@ internal sealed class ModEntry : Mod
         {
             if (Data.UltimateAccessGranted)
             {
-                Game1.addHUDMessage(new HUDMessage("극의는 이미 해방되어 있습니다."));
+                Game1.addHUDMessage(new HUDMessage(I18n.Get("unlock.ultimate.already")));
                 Game1.playSound("cancel");
                 return true;
             }
@@ -2054,7 +2054,7 @@ internal sealed class ModEntry : Mod
             ConsumeActiveObject(held);
 
             Game1.addHUDMessage(new HUDMessage(
-                "극의가 해방되었습니다.",
+                I18n.Get("unlock.ultimate.done"),
                 HUDMessage.newQuest_type
             ));
             Game1.playSound("stardrop");
@@ -2202,7 +2202,7 @@ internal sealed class ModEntry : Mod
 
         Skills.ExecuteRespec(Data);
         Game1.addHUDMessage(new HUDMessage(
-            Helper.Translation.Get("reset.completed"),
+            I18n.Get("reset.completed"),
             HUDMessage.newQuest_type
         ));
     }
@@ -2234,7 +2234,7 @@ internal sealed class ModEntry : Mod
                 RefreshUnlockState(showMessages: true);
 
                 Game1.addHUDMessage(new HUDMessage(
-                    Helper.Translation.Get("level.up", new { level = Data.SwordLevel }),
+                    I18n.Get("level.up", new { level = Data.SwordLevel }),
                     HUDMessage.newQuest_type
                 ));
             }
@@ -2271,21 +2271,21 @@ internal sealed class ModEntry : Mod
 
         if (!prevOhgiQuest && Data.OhgiQuestAvailable)
         {
-            Game1.addHUDMessage(new HUDMessage("오의 해방 퀘스트가 생겼습니다.", HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(I18n.Get("notify.ohgi.quest"), HUDMessage.newQuest_type));
             Game1.playSound("questcomplete");
         }
 
         if (!prevUltimateQuest && Data.UltimateQuestAvailable)
         {
-            Game1.addHUDMessage(new HUDMessage("극의 해방 퀘스트가 생겼습니다.", HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(I18n.Get("notify.ultimate.quest"), HUDMessage.newQuest_type));
             Game1.playSound("questcomplete");
         }
 
         if (!prevOhgiAccess && Data.OhgiAccessGranted)
-            Game1.addHUDMessage(new HUDMessage("오의가 해방되었습니다.", HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(I18n.Get("unlock.ohgi.done"), HUDMessage.newQuest_type));
 
         if (!prevUltimateAccess && Data.UltimateAccessGranted)
-            Game1.addHUDMessage(new HUDMessage("극의가 해방되었습니다.", HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(I18n.Get("unlock.ultimate.done"), HUDMessage.newQuest_type));
     }
 
     private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
@@ -2323,12 +2323,12 @@ internal sealed class ModEntry : Mod
 
         if (Data.SwordLevel >= Config.MaxSwordLevel)
         {
-            text = $"검술 Lv.{Data.SwordLevel}  MASTER  SP:{Data.UnspentSkillPoints}";
+            text = I18n.Get("hud.master", new { level = Data.SwordLevel, sp = Data.UnspentSkillPoints });
         }
         else
         {
             int req = Progression.GetRequiredXp(Data.SwordLevel);
-            text = $"검술 Lv.{Data.SwordLevel}  EXP {Data.SwordExperience}/{req}  SP:{Data.UnspentSkillPoints}";
+            text = I18n.Get("hud.progress", new { level = Data.SwordLevel, exp = Data.SwordExperience, req, sp = Data.UnspentSkillPoints });
         }
 
         float hudX = Math.Clamp(Config.HudX, 0, Math.Max(0, Game1.uiViewport.Width - 220));
@@ -2344,7 +2344,7 @@ internal sealed class ModEntry : Mod
         );
         b.DrawString(Game1.smallFont, text, pos, Color.White);
 
-        string prompt = $"[{Config.OpenMenuKey}] 검술창";
+        string prompt = I18n.Get("hud.open-menu", new { key = Config.OpenMenuKey });
         Vector2 promptPos = new(hudX, hudY + 28f);
 
         b.DrawString(
@@ -2568,7 +2568,7 @@ internal sealed class ModEntry : Mod
         Data.PendingNightReset = true;
 
         Game1.addHUDMessage(new HUDMessage(
-            Helper.Translation.Get("reset.scheduled", new { cost = Config.ResetCost }),
+            I18n.Get("reset.scheduled", new { cost = Config.ResetCost }),
             HUDMessage.newQuest_type
         ));
     }
