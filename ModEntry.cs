@@ -810,17 +810,26 @@ internal sealed class ModEntry : Mod
 
         foreach (NPC npc in e.Removed)
         {
-            if (npc is not Monster monster || monster.Health > 0)
+            if (npc is not Monster monster)
                 continue;
 
             string monsterName = monster.Name ?? string.Empty;
 
             if (Data.OhgiQuestStarted
                 && !Data.OhgiQuestCompleted
-                && IsHauntedSkull(monster))
+                && IsHauntedSkull(monster, e.Location))
             {
-                Data.OhgiSkullKills = Math.Min(30, Data.OhgiSkullKills + 1);
+                Data.OhgiSkullKills = Math.Min(
+                    30,
+                    Data.OhgiSkullKills + 1
+                );
+
                 UpdateOhgiQuestObjective();
+
+                Game1.addHUDMessage(new HUDMessage(
+                    $"귀신들린 해골 {Data.OhgiSkullKills}/30",
+                    HUDMessage.newQuest_type
+                ));
 
                 if (Data.OhgiSkullKills >= 30)
                     CompleteOhgiUnlockQuest();
@@ -844,11 +853,32 @@ internal sealed class ModEntry : Mod
         }
     }
 
-    private static bool IsHauntedSkull(Monster monster)
+    private static bool IsHauntedSkull(
+        Monster monster,
+        GameLocation location
+    )
     {
-        // Haunted Skull is implemented by Stardew as a Bat variant, so its
-        // Monster.Name is "Bat" rather than a unique "Haunted Skull" ID.
-        if (!string.Equals(monster.Name, "Bat", StringComparison.OrdinalIgnoreCase))
+        // Quarry Mine Haunted Skulls are created by the game as:
+        // new Bat(position, 77377)
+        //
+        // Therefore the most reliable identification is:
+        // Bat + quarry mine level 77377.
+        if (monster is Bat && IsQuarryMineLocation(location))
+            return true;
+
+        // Some builds/modded locations may expose a dedicated display/internal name.
+        string name = monster.Name ?? string.Empty;
+
+        if (string.Equals(
+            name,
+            "Haunted Skull",
+            StringComparison.OrdinalIgnoreCase
+        ))
+        {
+            return true;
+        }
+
+        if (monster is not Bat)
             return false;
 
         const BindingFlags flags =
@@ -858,8 +888,7 @@ internal sealed class ModEntry : Mod
 
         Type type = monster.GetType();
 
-        // 1.6 exposes the Bat hauntedSkull flag in current game builds, but use
-        // reflection here to remain tolerant of field/property shape changes.
+        // Secondary fallback: inspect known haunted-skull boolean flags.
         string[] boolMemberNames =
         {
             "hauntedSkull",
@@ -870,19 +899,21 @@ internal sealed class ModEntry : Mod
 
         foreach (string memberName in boolMemberNames)
         {
-            object? raw = type.GetField(memberName, flags)?.GetValue(monster)
+            object? raw =
+                type.GetField(memberName, flags)?.GetValue(monster)
                 ?? type.GetProperty(memberName, flags)?.GetValue(monster);
 
             if (TryReadBoolLikeValue(raw, out bool value) && value)
                 return true;
         }
 
-        // Fallback: identify the dedicated Haunted Skull texture if the flag is
-        // unavailable in a future build.
+        // Last fallback: inspect the sprite texture name.
         object? sprite = monster.Sprite;
+
         if (sprite is not null)
         {
             Type spriteType = sprite.GetType();
+
             string[] textureMemberNames =
             {
                 "TextureName",
@@ -892,13 +923,23 @@ internal sealed class ModEntry : Mod
 
             foreach (string memberName in textureMemberNames)
             {
-                object? raw = spriteType.GetField(memberName, flags)?.GetValue(sprite)
+                object? raw =
+                    spriteType.GetField(memberName, flags)?.GetValue(sprite)
                     ?? spriteType.GetProperty(memberName, flags)?.GetValue(sprite);
 
                 string? textureName = ReadStringLikeValue(raw);
+
                 if (!string.IsNullOrWhiteSpace(textureName)
-                    && (textureName.Contains("Haunted Skull", StringComparison.OrdinalIgnoreCase)
-                        || textureName.Contains("HauntedSkull", StringComparison.OrdinalIgnoreCase)))
+                    && (
+                        textureName.Contains(
+                            "Haunted Skull",
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                        || textureName.Contains(
+                            "HauntedSkull",
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    ))
                 {
                     return true;
                 }
@@ -906,6 +947,92 @@ internal sealed class ModEntry : Mod
         }
 
         return false;
+    }
+
+    private static bool IsQuarryMineLocation(GameLocation location)
+    {
+        const int QuarryMineLevel = 77377;
+
+        // Fast name fallback for mine locations whose unique name embeds the floor.
+        string locationName =
+            location.NameOrUniqueName
+            ?? location.Name
+            ?? string.Empty;
+
+        if (locationName.Contains(
+            QuarryMineLevel.ToString(),
+            StringComparison.OrdinalIgnoreCase
+        ))
+        {
+            return true;
+        }
+
+        // MineShaft exposes mineLevel in game builds, but use reflection so this
+        // remains tolerant of member-shape changes.
+        const BindingFlags flags =
+            BindingFlags.Instance
+            | BindingFlags.Public
+            | BindingFlags.NonPublic;
+
+        Type locationType = location.GetType();
+
+        string[] memberNames =
+        {
+            "mineLevel",
+            "MineLevel",
+            "netMineLevel"
+        };
+
+        foreach (string memberName in memberNames)
+        {
+            object? raw =
+                locationType.GetField(memberName, flags)?.GetValue(location)
+                ?? locationType.GetProperty(memberName, flags)?.GetValue(location);
+
+            if (TryReadIntLikeValue(raw, out int level)
+                && level == QuarryMineLevel)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryReadIntLikeValue(
+        object? raw,
+        out int value
+    )
+    {
+        value = 0;
+
+        if (raw is null)
+            return false;
+
+        if (raw is int direct)
+        {
+            value = direct;
+            return true;
+        }
+
+        PropertyInfo? valueProperty = raw
+            .GetType()
+            .GetProperty(
+                "Value",
+                BindingFlags.Instance
+                | BindingFlags.Public
+                | BindingFlags.NonPublic
+            );
+
+        object? nested = valueProperty?.GetValue(raw);
+
+        if (nested is int nestedInt)
+        {
+            value = nestedInt;
+            return true;
+        }
+
+        return int.TryParse(raw.ToString(), out value);
     }
 
     private static bool TryReadBoolLikeValue(object? raw, out bool value)
