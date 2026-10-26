@@ -1,0 +1,88 @@
+name: Preserve verified artifact in an existing Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful build run ID in this repository
+        required: true
+        type: string
+      artifact_name:
+        description: Exact artifact name (archive before its one-day expiry)
+        required: true
+        type: string
+      release_tag:
+        description: Existing Release tag pointing to the build commit
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify build provenance and existing Release
+        uses: actions/github-script@v7
+        env:
+          BUILD_RUN_ID: ${{ inputs.run_id }}
+          ARTIFACT_NAME: ${{ inputs.artifact_name }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        with:
+          script: |
+            const repo = context.repo;
+            const raw = process.env.BUILD_RUN_ID;
+            if (!/^[1-9][0-9]*$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+              throw new Error('A positive numeric run ID is required.');
+            }
+            const {data: run} = await github.rest.actions.getWorkflowRun({...repo, run_id: Number(raw)});
+            if (run.status !== 'completed' || run.conclusion !== 'success' || run.event === 'pull_request' || run.event === 'pull_request_target') {
+              throw new Error('Select a completed successful branch build, not a PR merge build.');
+            }
+            // Archive only the reviewed build workflows, which package the run's source commit.
+            const allowedWorkflows = [".github/workflows/main.yml"];
+            if (!allowedWorkflows.includes(run.path)) throw new Error('This workflow is not an approved release build.');
+            const tag = process.env.RELEASE_TAG;
+            if (!tag || tag.startsWith('-')) throw new Error('An existing Release tag is required.');
+            await github.rest.repos.getReleaseByTag({...repo, tag});
+            const {data: commit} = await github.rest.repos.getCommit({...repo, ref: `refs/tags/${tag}`});
+            if (commit.sha !== run.head_sha) throw new Error('Release tag and build commit must match.');
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {...repo, run_id: Number(raw), per_page: 100});
+            const matches = artifacts.filter(a => a.name === process.env.ARTIFACT_NAME && !a.expired);
+            if (matches.length !== 1) throw new Error('Select exactly one unexpired artifact from this run.');
+            core.info(`Verified build ${run.head_sha} and artifact ${matches[0].id}; existing assets will not be replaced.`);
+      - name: Download existing artifact without creating another artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          name: ${{ inputs.artifact_name }}
+          path: release-files
+      - name: Preserve files without replacing assets or publishing the Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          tag = os.environ['RELEASE_TAG']
+          files = sorted(p for p in Path('release-files').rglob('*') if p.is_file())
+          if not files or any(p.is_symlink() for p in files):
+              raise SystemExit('Expected nonempty regular artifact files.')
+          names = [p.name for p in files]
+          if len(names) != len(set(names)) or any('#' in n for n in names):
+              raise SystemExit('Asset filenames must be unique and contain no # characters.')
+          release = json.loads(subprocess.check_output(['gh', 'release', 'view', tag, '--json', 'assets'], text=True))
+          existing = {a['name'] for a in release['assets']}
+          collisions = existing.intersection(names)
+          if collisions:
+              raise SystemExit('Existing assets preserved; refusing duplicate names: ' + ', '.join(sorted(collisions)))
+          # No --clobber, release create/edit, tag mutation, or artifact deletion.
+          subprocess.run(['gh', 'release', 'upload', tag, *map(str, files)], check=True)
+          print(f'Preserved {len(files)} files in the existing Release; publication state unchanged.')
+          PY

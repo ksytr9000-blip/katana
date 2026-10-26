@@ -52,6 +52,8 @@ jobs:
       - name: Upload Nexus / Vortex ZIP
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
+          compression-level: 0
           name: SwordMastery-Nexus-Vortex-${{ env.MOD_VERSION }}
           path: SwordMastery-${{ env.MOD_VERSION }}-Nexus-Vortex.zip
           if-no-files-found: error
