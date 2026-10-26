@@ -1,0 +1,36 @@
+name: Audit existing Actions storage
+
+on:
+  push:
+    branches: ['chore/actions-artifact-cleanup-20261026']
+    paths: ['.github/workflows/audit-actions-storage.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const repo = context.repo;
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {...repo, per_page: 100});
+            const releases = await github.paginate(github.rest.repos.listReleases, {...repo, per_page: 100});
+            const prs = await github.paginate(github.rest.pulls.list, {...repo, state: 'open', per_page: 100});
+            const tags = await github.paginate(github.rest.repos.listTags, {...repo, per_page: 100});
+            for (const a of artifacts) {
+              console.log('STORAGE_ARTIFACT ' + JSON.stringify({id:a.id,name:a.name,size:a.size_in_bytes,digest:a.digest,created:a.created_at,expires:a.expires_at,expired:a.expired,run:a.workflow_run}));
+            }
+            for (const r of releases) {
+              console.log('STORAGE_RELEASE ' + JSON.stringify({id:r.id,tag:r.tag_name,draft:r.draft,assets:r.assets.map(a=>({id:a.id,name:a.name,size:a.size,digest:a.digest}))}));
+            }
+            console.log('STORAGE_PROTECTED ' + JSON.stringify({prs:prs.map(p=>({number:p.number,sha:p.head.sha,branch:p.head.ref})),tags:tags.map(t=>({name:t.name,sha:t.commit.sha}))}));
+            const result = {repository:context.repo.repo,count:artifacts.length,bytes:artifacts.reduce((sum,a)=>sum+a.size_in_bytes,0),expired:artifacts.filter(a=>a.expired).length};
+            console.log('STORAGE_TOTAL ' + JSON.stringify(result));
+            await core.summary.addHeading('Actions storage inventory').addCodeBlock(JSON.stringify(result,null,2),'json').addRaw('Read-only audit. No artifacts, releases, tags, or source files were changed.').write();
