@@ -1,0 +1,84 @@
+name: Archive reviewed old Actions artifacts
+
+on:
+  push:
+    branches: ['chore/actions-artifact-cleanup-20261026']
+    paths: ['.github/workflows/archive-old-artifacts.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: archive-reviewed-old-artifacts
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = {"repo":"katana","base":"63d99d9a2d30f6678bb925803712783b7778df3e","keepIds":[12650736776,12649649742,12632109719,11617619462],"artifacts":[{"id":11617327632,"name":"SwordMastery-Install","size":607326,"digest":"sha256:7469cfc8a67e832b3291ac87f8011ff95624d2ea25369667af23729e45b240cc","run_id":37933796337,"head_sha":"514ff7539b9b5e53e9df34993d55a436db680217","created":"2026-10-09T13:00:39Z"},{"id":11616081522,"name":"SwordMastery-Install","size":605579,"digest":"sha256:e2291afbde0c93cc0ae4fef428cf0f636aeed850181404954957c4d0ea790603","run_id":37930564404,"head_sha":"359ed2a8b7e3777967cd25c4b310dccb41f63000","created":"2026-10-09T12:31:29Z"},{"id":11613839669,"name":"SwordMastery-Install","size":605106,"digest":"sha256:aa7db5863bd34533b05fdc1da099a84f7468be1513c2173e0f2c083dee6c32aa","run_id":37927212463,"head_sha":"0e3bc6aadcf290daa5aa18b88a6531049f6b9963","created":"2026-10-09T12:00:25Z"},{"id":11575555460,"name":"SwordMastery-Install","size":604155,"digest":"sha256:4c7a58c3b44072dcab1d47d28c6f3dbf71c15b7812861c877c6505269c1b772a","run_id":37834544207,"head_sha":"627a996eb5be8beb9ef7239f058fa870a2fb850c","created":"2026-10-08T19:47:27Z"},{"id":11574765621,"name":"SwordMastery-Install","size":604158,"digest":"sha256:740f752adef4afad6d0a5e34743fa8985d315a510fdbc486b82d357bc54efa2d","run_id":37833401542,"head_sha":"1994fe602683a557435254c2b192b6de0f3d7c76","created":"2026-10-08T19:38:19Z"},{"id":11572959065,"name":"SwordMastery-Install","size":604077,"digest":"sha256:78cab40b917fa97fbc84689fbf912e92075c2a369351ad42ea99ccd2796a8ef2","run_id":37831476964,"head_sha":"e84cdc821281f71f5c2eaa37a47b2dfa2a59cac9","created":"2026-10-08T19:23:00Z"},{"id":11572484194,"name":"SwordMastery-Install","size":603706,"digest":"sha256:d38e1770ae27ac254794b0c0578f6f0a251a732ecf15e659ccfb0dd35ac463b8","run_id":37829657708,"head_sha":"00c528953532680d639faf2d0b6aaad861ae3fa3","created":"2026-10-08T19:08:28Z"},{"id":11570638899,"name":"SwordMastery-Install","size":602672,"digest":"sha256:66d1b7603c4ea3dd0827a2ffc6bd336ba0fa49ad515901727fae14d73502c149","run_id":37825421684,"head_sha":"9bfde1658899f8c804d6f6316e29103c88c6cf56","created":"2026-10-08T18:35:26Z"},{"id":11568850022,"name":"SwordMastery-Install","size":594107,"digest":"sha256:80d3296b52e958e75b4a9f643331916d1b1b40c0ed485203d0354d9d52c1cf54","run_id":37818457845,"head_sha":"91e188e6f38d07793adc63a9712427c4f752ee2d","created":"2026-10-08T17:41:24Z"},{"id":11566840783,"name":"SwordMastery-Install","size":590846,"digest":"sha256:5a39db5d7047da4bf8438893f42ff7985383b6034f59382dddcfa1c5e98d13ca","run_id":37813979480,"head_sha":"3852034a82df7e9f18b24f474623bb1cb7de7989","created":"2026-10-08T17:06:41Z"},{"id":11565455210,"name":"SwordMastery-Install","size":590353,"digest":"sha256:beb76997c3554fc30ffa960700c4b491b40c70a2cac7b0fdcf5f365bae0008f0","run_id":37810657889,"head_sha":"deae7cbeedde17dad04b87de833ac7e7c115498e","created":"2026-10-08T16:40:58Z"},{"id":11561180789,"name":"SwordMastery-Install","size":583633,"digest":"sha256:41af53e191614abc7528d528446bfad3e619284a091b595fd725501a72878123","run_id":37801118981,"head_sha":"c1e97bc8dc48bcdb6d38e59d200022d927830dc0","created":"2026-10-08T15:29:17Z"},{"id":11561250356,"name":"SwordMastery-Install","size":582998,"digest":"sha256:df8e7bf128328730b63c98ca6b094841dc341c80133a169880e1815e3be6ce91","run_id":37800619409,"head_sha":"bbbbc58932021c61ec7b8f5ec5645493dfe61569","created":"2026-10-08T15:25:37Z"},{"id":11560372285,"name":"SwordMastery-Install","size":583034,"digest":"sha256:4822f7d4ec9ab45560ec9c3965046952c464bbb5c8f541e09d1d8c9d572ee56e","run_id":37800437797,"head_sha":"057500433f04a668a12f70fae94bcbd0ec6cc099","created":"2026-10-08T15:24:21Z"},{"id":11557342713,"name":"SwordMastery-Install","size":577331,"digest":"sha256:fe3e9bbdfae775fdf7acda3d6fb58c4b22961f98f7012417b623aecc9ed545b9","run_id":37794040993,"head_sha":"0cd0cf2e8556ef99433171b5745d8b54bd6227b8","created":"2026-10-08T14:38:12Z"},{"id":11555463853,"name":"SwordMastery-Install","size":573727,"digest":"sha256:d1321e96d0ec33038ce5cc08a6ed221f2e9268decbf2483c771d0be1e3246d44","run_id":37790423444,"head_sha":"06076938dbc833ee42de1478c61fa205edb94225","created":"2026-10-08T14:11:51Z"},{"id":11504745106,"name":"SwordMastery-Install","size":565109,"digest":"sha256:3b02edd6f1ffffc5a52556214b4e2dbb39c8d2576a66328960481de739d24c78","run_id":37669223802,"head_sha":"000aaf4a910fadcd990fe73976d731ef171aac22","created":"2026-10-07T18:45:27Z"},{"id":11503528575,"name":"SwordMastery-Install","size":564948,"digest":"sha256:6caffd08d91e0c1ca396690d1eaf4661a7303ce64a0f2df39e515d8cdeb06fa1","run_id":37668306554,"head_sha":"d192d0bf6367375ac7c6a7243a2e59f3be9b7f54","created":"2026-10-07T18:38:17Z"},{"id":11504006480,"name":"SwordMastery-Install","size":564476,"digest":"sha256:82acfceb58a62a2099548fc31a8de10db2df52995b3654aee008c3a5f886bac3","run_id":37667776904,"head_sha":"8915739161323d8e4a9ff748ed6ae70957375c85","created":"2026-10-07T18:34:06Z"},{"id":11502837422,"name":"SwordMastery-Install","size":563968,"digest":"sha256:30458b45138e7a523d0c0c8813f8bdb83df945e98233730d6b48ddddab2f2f6b","run_id":37666783962,"head_sha":"1def03425170c218d11e2e6072f0013a49bb2755","created":"2026-10-07T18:26:20Z"},{"id":11502501458,"name":"SwordMastery-Install","size":564146,"digest":"sha256:b7700d29e8f6fa6b09e69105e71cfe102eaebea519877eab149a542f0c122553","run_id":37665646055,"head_sha":"caebfc2def84249275f520ffd1a4ee575c6f66af","created":"2026-10-07T18:17:29Z"},{"id":11500874466,"name":"SwordMastery-Install","size":25637,"digest":"sha256:3e5261dd466f1f812d18d913153d9369819db2193c5f631ca9953fea9c10a60b","run_id":37663988641,"head_sha":"6a1ecac44bf28677607200cb36963ce88e614c4e","created":"2026-10-07T18:04:43Z"},{"id":11500520186,"name":"SwordMastery-Install","size":23741,"digest":"sha256:6f02cf87791b7a2a02addab2a043eeffe2c4b09e3d6ed454224291244a1719af","run_id":37658963500,"head_sha":"009903dcdd4ea8d12baca90b0d3f97a80c0ae641","created":"2026-10-07T17:25:53Z"},{"id":11498604911,"name":"SwordMastery-Install","size":23742,"digest":"sha256:356c2c85e2ad65a6f0ebd3b354dd67e8337c4e5b1aedf58c056d1eaf3fa61c0f","run_id":37658612526,"head_sha":"926295c21e22b6a250b5b7ea0480ea9a188b4583","created":"2026-10-07T17:23:17Z"},{"id":11498546781,"name":"SwordMastery-Install","size":20065,"digest":"sha256:a3f6d801f9c45f34349f7b656e99c0b7a3c0460ac145c5719ac726f663ad6ad2","run_id":37655763798,"head_sha":"be2447396b950547156660f6b0b077285e7a9241","created":"2026-10-07T17:02:11Z"}]};
+            // This one-off plan never selects files by age or name at execution time.
+            // Every deletion requires two independent SHA-256 checks and a durable draft Release asset.
+            const crypto = require('crypto');
+            const repo = context.repo;
+            const tag = 'actions-storage-archive-20261026';
+            const sha256 = data => 'sha256:' + crypto.createHash('sha256').update(data).digest('hex');
+            const bytes = data => {
+              if (Buffer.isBuffer(data)) return data;
+              if (data instanceof ArrayBuffer) return Buffer.from(data);
+              if (ArrayBuffer.isView(data)) return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+              throw new Error('Expected binary archive; refusing deletion');
+            };
+            const tagExists = async () => {
+              try { await github.rest.git.getRef({...repo, ref:'tags/' + tag}); return true; }
+              catch (error) { if (error.status === 404) return false; throw error; }
+            };
+            if (await tagExists()) throw new Error('Archive tag unexpectedly exists; refusing to modify tags');
+            const releases = await github.paginate(github.rest.repos.listReleases, {...repo, per_page:100});
+            const matching = releases.filter(r => r.tag_name === tag);
+            if (matching.length > 1 || matching.some(r => !r.draft)) throw new Error('Unsafe archive Release state');
+            const release = matching[0] || (await github.rest.repos.createRelease({...repo, tag_name:tag, target_commitish:plan.base, draft:true, prerelease:true, name:'Actions storage archive — 2026-10-26 (not a mod release)', body:'Lossless copies of superseded GitHub Actions artifacts. This is a private draft archive, not a published mod release. Original source, branches and existing tags are preserved. Each asset name includes its original artifact ID. Original SHA-256 is included in the asset label and workflow log. Actions copies are deleted only after the Release copy is downloaded and SHA-256 verified.'})).data;
+            if (await tagExists()) throw new Error('Unexpected tag creation; stopping without deleting artifacts');
+            let assets = await github.paginate(github.rest.repos.listReleaseAssets, {...repo, release_id:release.id, per_page:100});
+            const result = {repository:repo.repo,release_id:release.id,deleted:0,bytes:0,alreadyRemoved:0};
+            for (const entry of plan.artifacts) {
+              let artifact;
+              try { artifact = (await github.rest.actions.getArtifact({...repo, artifact_id:entry.id})).data; }
+              catch(error) {
+                if(error.status === 404) { result.alreadyRemoved++; continue; }
+                throw error;
+              }
+              if (artifact.expired || artifact.name !== entry.name || artifact.size_in_bytes !== entry.size || artifact.digest !== entry.digest || artifact.workflow_run.id !== entry.run_id || artifact.workflow_run.head_sha !== entry.head_sha || !/^sha256:[a-f0-9]{64}$/.test(entry.digest)) throw new Error('Artifact differs from reviewed plan: ' + entry.id);
+              const name = 'artifact-' + entry.id + '.zip';
+              let asset = assets.find(a => a.name === name);
+              if (!asset) {
+                const archive = bytes((await github.rest.actions.downloadArtifact({...repo, artifact_id:entry.id, archive_format:'zip'})).data);
+                if (archive.length !== entry.size || sha256(archive) !== entry.digest) throw new Error('Source checksum mismatch: ' + entry.id);
+                asset = (await github.rest.repos.uploadReleaseAsset({...repo, release_id:release.id, name, label:entry.name + ' | ' + entry.digest, data:archive, headers:{'content-type':'application/zip','content-length':archive.length}})).data;
+                assets.push(asset);
+              }
+              if (asset.size !== entry.size || asset.state !== 'uploaded') throw new Error('Archive asset incomplete: ' + entry.id);
+              // Re-download the durable copy; API metadata alone does not permit deletion.
+              const verified = bytes((await github.rest.repos.getReleaseAsset({...repo, asset_id:asset.id, headers:{accept:'application/octet-stream'}})).data);
+              if (verified.length !== entry.size || sha256(verified) !== entry.digest) throw new Error('Backup checksum mismatch: ' + entry.id);
+              console.log('STORAGE_BACKUP ' + JSON.stringify({...entry,release_id:release.id,asset_id:asset.id,asset_name:name,verified_sha256:sha256(verified)}));
+              // Recheck state immediately before deletion and never publish the draft.
+              const currentRelease = (await github.rest.repos.getRelease({...repo,release_id:release.id})).data;
+              if (!currentRelease.draft || await tagExists()) throw new Error('Archive state changed; refusing deletion');
+              await github.rest.actions.deleteArtifact({...repo,artifact_id:entry.id});
+              result.deleted++; result.bytes += entry.size;
+              console.log('STORAGE_DELETED ' + JSON.stringify({id:entry.id,bytes:entry.size,release_id:release.id,asset_id:asset.id}));
+            }
+            const remaining = await github.paginate(github.rest.actions.listArtifactsForRepo, {...repo,per_page:100});
+            for (const entry of plan.artifacts) if (remaining.some(a=>a.id === entry.id)) throw new Error('Deletion not confirmed: ' + entry.id);
+            result.remaining_count=remaining.length;
+            result.remaining_bytes=remaining.reduce((s,a)=>s+a.size_in_bytes,0);
+            console.log('STORAGE_CLEANUP_RESULT ' + JSON.stringify(result));
+            await core.summary.addHeading('Verified Actions artifact archive').addCodeBlock(JSON.stringify(result,null,2),'json').addRaw('All removed Actions files have SHA-256 verified copies in the unpublished draft Release. Latest files for each branch/name, validation logs, source backups and release-named files were excluded from this fixed plan.').write();
+            
