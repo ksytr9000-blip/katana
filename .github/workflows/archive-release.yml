@@ -41,6 +41,9 @@ jobs:
             if (run.status !== 'completed' || run.conclusion !== 'success' || run.event === 'pull_request' || run.event === 'pull_request_target') {
               throw new Error('Select a completed successful branch build, not a PR merge build.');
             }
+            // Archive only the reviewed build workflows, which package the run's source commit.
+            const allowedWorkflows = [".github/workflows/main.yml"];
+            if (!allowedWorkflows.includes(run.path)) throw new Error('This workflow is not an approved release build.');
             const tag = process.env.RELEASE_TAG;
             if (!tag || tag.startsWith('-')) throw new Error('An existing Release tag is required.');
             await github.rest.repos.getReleaseByTag({...repo, tag});
