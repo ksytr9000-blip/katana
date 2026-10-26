@@ -1,0 +1,42 @@
+name: Check Actions storage policy
+
+on:
+  push:
+    paths: ['.github/workflows/**']
+  pull_request:
+    paths: ['.github/workflows/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  storage-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m pip install 'PyYAML==6.0.2'
+      - name: Require one-day retention on every artifact upload
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import yaml
+          count = 0
+          for path in sorted(Path('.github/workflows').glob('*')):
+              if path.suffix not in {'.yml', '.yaml'}:
+                  continue
+              workflow = yaml.safe_load(path.read_text())
+              for job in workflow.get('jobs', {}).values():
+                  for step in job.get('steps', []):
+                      if str(step.get('uses', '')).lower().startswith('actions/upload-artifact@'):
+                          count += 1
+                          days = step.get('with', {}).get('retention-days')
+                          if type(days) is not int or days != 1:
+                              raise SystemExit(f'{path}: {step.get("name", "upload-artifact")} must set retention-days: 1')
+          print(f'PASS: all {count} artifact uploads explicitly retain files for one day.')
+          PY
